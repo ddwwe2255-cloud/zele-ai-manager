@@ -67,7 +67,11 @@ Thread(target=run_server, daemon=True).start()
 # ==========================================
 # 4. ቴሌግራም ክላይንት እና ዋናው ሎጂክ
 # ==========================================
-client = TelegramClient(StringSession(session_string), api_id, api_hash)
+
+# ⚠️ አዲሱ የተስተካከለው የክላውድ ሰርቨር ኮድ ⚠️
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+client = TelegramClient(StringSession(session_string), api_id, api_hash, loop=loop)
 
 @client.on(events.NewMessage(incoming=True))
 async def super_smart_manager(event):
@@ -205,7 +209,6 @@ async def process_and_reply(event, sender_id, sender_name, user_message, is_grou
         
         fallback_sent_list = memory.get("fallback_sent", [])
         if sender_id not in fallback_sent_list:
-            # ⚠️ አዲሱ የተቀየረው የ Offline መልእክት ⚠️
             fallback_msg = f"ሰላም {sender_name}! አለቃዬ አሁን ኦንላይን የለም። መልእክትህን አስቀምጥልኝ፣ ልክ ሲመጣ አደርስለታለሁ እሱ ራሱ ይመልስልሃል።\n\n" + signature
             await event.reply(fallback_msg, reply_to=event.id, parse_mode='html')
             
