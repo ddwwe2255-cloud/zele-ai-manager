@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 import pytz
 from dotenv import load_dotenv
 
-# 1. መረጃዎችን ከ Environment Variables ማንበብ (ክላውድ ላይ ስለሚጫን)
+# 1. Environment Variables
 load_dotenv()
 
 API_ID = int(os.getenv('API_ID', 0))
@@ -29,21 +29,22 @@ GEMINI_KEYS = [k.strip() for k in raw_keys.split(',')] if raw_keys else []
 
 AI_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash']
 
-# 2. Cloud-Safe Memory Management
+# 2. Memory Lock & State
 MEMORY_FILE = 'memory.json'
 memory_lock = asyncio.Lock()
 
 def _load_memory():
-    default_data = {"status": "online", "personality": "አንተ ትሁት የ AI ማኔጀር ነህ።", "missed": [], "processed_ids": []}
+    default_data = {"status": "online", "personality": "አንተ ትሁት የአለቃ ፈዬ AI ማኔጀር ነህ።", "missed": [], "processed_ids": [], "fallback_timestamps": {}}
     if not os.path.exists(MEMORY_FILE):
         return default_data
     try:
         with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
             data.setdefault("status", "online")
-            data.setdefault("personality", "አንተ ትሁት የ AI ማኔጀር ነህ።")
+            data.setdefault("personality", "አንተ ትሁት የአለቃ ፈዬ AI ማኔጀር ነህ።")
             data.setdefault("missed", [])
             data.setdefault("processed_ids", [])
+            data.setdefault("fallback_timestamps", {})
             return data
     except:
         return default_data
@@ -61,7 +62,7 @@ def _save_memory(data):
 
 _save_memory(_load_memory())
 
-# 3. Flask Server (UptimeRobot እንዲያገኘው)
+# 3. Flask Server
 app = Flask(__name__)
 @app.route('/')
 def home():
@@ -72,12 +73,11 @@ def run_server():
 
 Thread(target=run_server, daemon=True).start()
 
-# 4. Telegram Clients (Cloud-Safe StringSessions for BOTH)
+# 4. Telegram Clients
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
 user_client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH, loop=loop)
-# Control bot also uses StringSession('') to prevent file errors on ephemeral disks
 bot_client = TelegramClient(StringSession(''), API_ID, API_HASH, loop=loop)
 ethiopia_tz = pytz.timezone('Africa/Addis_Ababa')
 
@@ -88,7 +88,7 @@ MY_USER_ID = None
 # ==========================================
 @bot_client.on(events.NewMessage(pattern='/start'))
 async def bot_start(event):
-    await event.reply("👋 ሰላም ዘላለም! የ Cloud AI Manager ተነስቷል።\n\n"
+    await event.reply("👋 ሰላም አለቃ ፈዬ! የ Cloud AI Manager ተነስቷል።\n\n"
                       "**ትዕዛዞች:**\n"
                       "🔴 `/away` - ቦቱን ወደ Away Mode ለመቀየር\n"
                       "🟢 `/online` - ወደ መደበኛ ስራ ለመመለስ\n"
@@ -173,21 +173,19 @@ async def auto_manager(event):
     async with memory_lock:
         mem = _load_memory()
         current_status = mem.get("status", "online")
-        persona = mem.get("personality", "አንተ ትሁት የ AI ማኔጀር ነህ።")
+        persona = mem.get("personality", "አንተ ትሁት የአለቃ ፈዬ AI ማኔጀር ነህ።")
         mem.setdefault("processed_ids", []).append(msg_id)
         _save_memory(mem)
 
-    hour = datetime.now(ethiopia_tz).hour
-    is_night = hour >= 22 or hour < 6
     user_text = event.text or "[ፎቶ/ፋይል ተልኳል]"
-
     short_msg = (user_text[:40] + '..') if len(user_text) > 40 else user_text
+    
     async with memory_lock:
         mem = _load_memory()
         mem.setdefault("missed", []).append({"name": sender_name, "text": short_msg})
         _save_memory(mem)
         
-    status_instruction = "ማሳሰቢያ: አለቃዬ የለም (ወይም ተኝቷል)። መልዕክትህን አስቀምጫለሁ በለው።" if current_status == "away" or is_night else "አለቃዬ ቢዚ ስለሆነ፣ እኔ የሱ ማኔጀር እያነጋገርኩህ ነው በለው።"
+    status_instruction = "ማሳሰቢያ: አለቃ ፈዬ የለም (ወይም ተኝቷል)። መቼ እንደሚመለስ እርግጠኛ አይደለሁም፣ ግን መልዕክትህን አስቀምጫለሁ ብለህ ቀስ ብለህ ንገረው።" if current_status == "away" else "አለቃ ፈዬ አሁን ትንሽ ቢዚ ስለሆነ፣ እኔ የሱ AI ማኔጀር እያነጋገርኩህ ነው በለው።"
 
     prompt = f"""
     {persona}
@@ -196,12 +194,13 @@ async def auto_manager(event):
     ህግ:
     1. ተፈጥሯዊ እና አጭር አማርኛ ተጠቀም።
     2. {status_instruction}
-    3. እራስህን 'የዘላለም AI ማኔጀር' ብለህ አስተዋውቅ።
+    3. እራስህን 'የአለቃ ፈዬ AI ማኔጀር' ብለህ አስተዋውቅ።
     """
 
     response_text = None
     success = False
 
+    # የ API ቁልፎችን እና ሞዴሎችን ተራ በተራ መሞከር
     for key in GEMINI_KEYS:
         if success: break
         for model in AI_MODELS:
@@ -211,27 +210,60 @@ async def auto_manager(event):
                     response_text = response.text
                     success = True
                     break 
-            except:
+            except Exception as e:
+                print(f"API Error Handled Silently: {e}")
                 continue
 
-    signature = "\n\n🤖 *AI Manager*"
+    # ዘመናዊ ፊርማ (Blockquote format)
+    signature = "\n\n> ✦ **𝙁𝙧𝙤𝙢 𝙈𝙖𝙣𝙖𝙜𝙚𝙧** ✦"
+    
     if not success or not response_text:
-        final_reply = f"ሰላም {sender_name}! እኔ የዘላለም AI ረዳት ነኝ። አለቃዬ አሁን ኦንላይን ስላልሆነ፣ መልዕክትህን መዝግቤ ይዤዋለሁ። ሲመጣ ራሱ ያናግርሃል። {signature}"
+        # 100% Offline Fallback Logic (API ካልሰራ)
+        async with memory_lock:
+            mem = _load_memory()
+            fallback_timestamps = mem.get("fallback_timestamps", {})
+            last_sent = fallback_timestamps.get(sender_id, 0)
+            
+            # ከ 1 ሰዓት (3600 ሰከንድ) በፊት ከተላከ ብቻ አዲሱን መልእክት ይልካል
+            if time.time() - last_sent >= 3600:
+                fallback_msg = f"👋 ሰላም! 😊\n🤖 እኔ AI Manager ነኝ። አለቃዬ ለጊዜው Online ስላልሆነ፣ መልዕክት ካለዎት እዚህ መተው ይችላሉ። ሲመለስ አሳውቀዋለሁ፤ እሱም በራሱ ይመልስልዎታል። 💬\n🙏 መልካም ጊዜ!{signature}"
+                
+                try:
+                    await event.reply(fallback_msg, parse_mode='md')
+                except Exception:
+                    await event.reply(fallback_msg)
+                
+                # የተላከበትን ሰዓት ማደስ
+                fallback_timestamps[sender_id] = time.time()
+                mem["fallback_timestamps"] = fallback_timestamps
+                _save_memory(mem)
+                
+                try:
+                    await bot_client.send_message(MY_USER_ID, f"🔔 **Offline ምላሽ ተሰጥቷል!**\n👤 ከ: {sender_name}\n💬: {short_msg}")
+                except: pass
+            else:
+                print(f"🤐 [SILENT] Suppressed Offline message for {sender_name} (1 hour limit).")
     else:
+        # API ሰርቶ AIው መልስ ከሰጠ
         final_reply = f"{response_text}{signature}"
-
-    try:
-        await event.reply(final_reply, parse_mode='md')
         try:
-            await bot_client.send_message(MY_USER_ID, f"🔔 **ምላሽ ተሰጥቷል!**\n👤 ከ: {sender_name}\n💬: {short_msg}\n🤖: {final_reply[:50]}...")
+            await event.reply(final_reply, parse_mode='md')
+        except FloodWaitError as e:
+            await asyncio.sleep(e.seconds)
+            await event.reply(final_reply, parse_mode='md')
+        except Exception:
+            await event.reply(final_reply)
+
+        try:
+            await bot_client.send_message(MY_USER_ID, f"🔔 **AI ምላሽ ሰጥቷል!**\n👤 ከ: {sender_name}\n💬: {short_msg}\n🤖: {final_reply[:50]}...")
         except: pass
-    except FloodWaitError as e:
-        print(f"Sleeping for {e.seconds}s due to FloodWait")
-        await asyncio.sleep(e.seconds)
-        await event.reply(final_reply)
-    except:
-        try: await event.reply(final_reply)
-        except: pass
+        
+        # AI ከሰራ የ 1 ሰዓቱን የጥበቃ ቆጠራ መሰረዝ
+        async with memory_lock:
+            mem = _load_memory()
+            if sender_id in mem.get("fallback_timestamps", {}):
+                del mem["fallback_timestamps"][sender_id]
+                _save_memory(mem)
 
 async def keep_online():
     while True:
