@@ -3,8 +3,7 @@ import asyncio
 import json
 import time
 import html
-import urllib.request
-import urllib.error
+import requests
 from threading import Thread
 from flask import Flask
 from telethon import TelegramClient, events
@@ -29,8 +28,8 @@ MY_USERNAME = os.getenv('MY_USERNAME', '@zele1216')
 raw_keys = os.getenv('GEMINI_API_KEYS', '')
 GEMINI_KEYS = [k.strip() for k in raw_keys.split(',') if k.strip()]
 
-# የሚደገፉ ፈጣን ሞዴሎች
-AI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash']
+# በ curl ትዕዛዝህ መሰረት የሚሰሩት ሞዴሎች
+AI_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']
 
 # ==========================================
 # 2. Memory & Settings
@@ -41,8 +40,8 @@ LAST_BOSS_ACTION_TIME = 0
 BOT_SENT_IDS = set()
 
 DEFAULT_PERSONA = (
-    "You are the courteous, smart, and direct Personal AI Manager of your boss. "
-    "You communicate with respect, clarity, and natural tone without giving unnecessary robotic disclaimers."
+    "You are the authentic, highly intelligent, courteous, and professional Personal AI Manager of your boss. "
+    "You respond directly, naturally, and warmly without giving repetitive or robotic disclaimers."
 )
 
 def _load_memory():
@@ -78,7 +77,7 @@ def _save_memory(data):
 _save_memory(_load_memory())
 
 # ==========================================
-# 3. Flask Server (UptimeRobot 24/7 እንዲያነቃው)
+# 3. Flask Server
 # ==========================================
 app = Flask(__name__)
 
@@ -114,7 +113,7 @@ async def bot_start(event):
         "🔴 `/away` - ቦቱ ወዲያውኑ እንዲመልስ\n"
         "🟢 `/online` - አንተ በቻት ላይ ንቁ ስትሆን 2 ደቂቃ እንዲጠብቅ\n"
         "🔄 `/reset_persona` - ፀባዩን ወደ ንጹህ ፕሮፌሽናል ለመመለስ\n"
-        "📊 `/report` - ያልተመለሱ መልዕክቶችን ሪፖርት ለማየት"
+        "📊 `/report` - ያልተመለሱ መልዕክቶችን ለማየት"
     )
 
 @bot_client.on(events.NewMessage(pattern='/away'))
@@ -123,7 +122,7 @@ async def set_away(event):
         mem = _load_memory()
         mem["status"] = "away"
         _save_memory(mem)
-    await event.reply("🔴 ሁኔታህ ወደ **AWAY** ተቀይሯል። ቦቱ ወዲያውኑ ይመልሳል!")
+    await event.reply("🔴 ሁኔታህ ወደ **AWAY** ተቀይሯል።")
 
 @bot_client.on(events.NewMessage(pattern='/online'))
 async def set_online(event):
@@ -131,7 +130,7 @@ async def set_online(event):
         mem = _load_memory()
         mem["status"] = "online"
         _save_memory(mem)
-    await event.reply("🟢 ሁኔታህ ወደ **ONLINE** ተመልሷል። አንተ በቻት ንቁ ስትሆን 2 ደቂቃ ይጠብቅሃል።")
+    await event.reply("🟢 ሁኔታህ ወደ **ONLINE** ተመልሷል።")
 
 @bot_client.on(events.NewMessage(pattern='/reset_persona'))
 async def reset_persona(event):
@@ -139,7 +138,7 @@ async def reset_persona(event):
         mem = _load_memory()
         mem["personality"] = DEFAULT_PERSONA
         _save_memory(mem)
-    await event.reply("✅ የ AI ፀባይ ወደ ዋናው ፕሮፌሽናል ደረጃ ተመልሷል!")
+    await event.reply("✅ የ AI ፀባይ ተስተካክሏል!")
 
 @bot_client.on(events.NewMessage(pattern='/report'))
 async def get_report(event):
@@ -159,17 +158,26 @@ async def get_report(event):
         _save_memory(mem)
 
 # ==========================================
-# 6. Ultra-Reliable AI Request Handler (Built-in urllib)
+# 6. ትክክለኛው የ Google curl አሰራር
 # ==========================================
 def run_ai_request(api_key, model_name, prompt):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key.strip()}"
-    headers = {"Content-Type": "application/json"}
-    payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
-    
-    req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=12) as response:
-        res_data = json.loads(response.read().decode("utf-8"))
-        return res_data["candidates"][0]["content"]["parts"][0]["text"]
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+    headers = {
+        "Content-Type": "application/json",
+        "X-goog-api-key": api_key.strip()
+    }
+    payload = {
+        "contents": [
+            {
+                "parts": [{"text": prompt}]
+            }
+        ]
+    }
+    res = requests.post(url, headers=headers, json=payload, timeout=12)
+    if res.status_code == 200:
+        data = res.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+    raise Exception(f"API Error {res.status_code}: {res.text}")
 
 # ==========================================
 # 7. USERBOT CORE
@@ -182,7 +190,10 @@ def is_bot_message(msg):
     txt = msg.text or ""
     return "From Manager" in txt or "𝙁𝙧𝙤𝙢 𝙈𝙖𝙣𝙖𝙜𝙚𝙧" in txt
 
-# አለቃው መልዕክት እየጻፈ መሆኑን መከታተያ
+def has_amharic(text):
+    """መልዕክቱ ውስጥ የአማርኛ ፊደል መኖሩን ያረጋግጣል"""
+    return any(0x1200 <= ord(c) <= 0x137F for c in text)
+
 @user_client.on(events.NewMessage(outgoing=True))
 async def track_boss_activity(event):
     global LAST_BOSS_ACTION_TIME
@@ -209,28 +220,23 @@ async def auto_manager(event):
             return
         current_status = mem.get("status", "online")
 
-    # ወዲያውኑ መልዕክቱን አንብቦ Seen (ሁለት ራይት) ያደርገዋል
     try:
         await event.mark_read()
     except Exception:
         pass
 
-    # ---------------------------------------------------------
-    # የ 2 ደቂቃ ጥበቃ ሎጂክ፦ አለቃው ራሱ በቅርቡ ጽፎ ከነበረ ብቻ 2 ደቂቃ ይጠብቃል!
-    # ---------------------------------------------------------
+    # አንተ ራስህ እየጻፍክ ከነበረ ብቻ 2 ደቂቃ ይጠብቃል፣ ካልሆነ በ 2 ሰከንድ ይመልሳል
     boss_is_actively_chatting = (time.time() - LAST_BOSS_ACTION_TIME) < 120
 
     if current_status == "online" and boss_is_actively_chatting:
-        # አንተ ንቁ ስለሆንክ 2 ደቂቃ (120 ሰከንድ) ይጠብቅሃል
         await asyncio.sleep(120)
         try:
             after_msgs = await user_client.get_messages(event.chat_id, limit=5)
             if any(m.out and not is_bot_message(m) and m.id > msg_id for m in after_msgs if m):
-                return  # አንተ መልሰሃል፤ ቦቱ ዝም ይላል
+                return
         except Exception:
             pass
     else:
-        # አንተ Online አይደለህም! ምንም ሳይጠብቅ በ 2 ሰከንድ ይመልሳል
         await asyncio.sleep(2)
 
     async with memory_lock:
@@ -249,7 +255,7 @@ async def auto_manager(event):
         mem.setdefault("missed", []).append({"name": sender_name, "text": short_msg})
         _save_memory(mem)
 
-    # ያለፉትን 60 መልዕክቶች Scan ማድረግ
+    # ያለፉትን 60 መልዕክቶች ማንበብ
     chat_context = ""
     try:
         hist = await user_client.get_messages(event.chat_id, limit=60)
@@ -265,8 +271,7 @@ async def auto_manager(event):
     except Exception as e:
         print(f"History scan error: {e}")
 
-    hour = datetime.now(ethiopia_tz).hour
-    is_night = hour >= 22 or hour < 6
+    is_amharic_user = has_amharic(user_text) or has_amharic(chat_context)
 
     prompt = f"""
 {persona}
@@ -274,21 +279,21 @@ async def auto_manager(event):
 [Chat History (Last 60 Messages)]
 {chat_context}
 
-[New Incoming Message]
+[Current Message]
 Sender: {sender_name}
 Message: "{user_text}"
-Current Hour: {hour}:00
 
-በጣም ጥብቅ መመሪያዎች (በትክክል ተግብር):
-1. ምንም ዓይነት ረጅም ሰበብ፣ ማስጠንቀቂያ ወይም ደረቅ የሮቦት ማብራሪያ (disclaimer) አትስጥ! (ምክንያት አታብዛ!)
-2. ሰውየው የጠየቀውን ጥያቄ በቀጥታ፣ በአጭሩ እና በተፈጥሯዊ መንገድ መልስ።
-   - ለምሳሌ፦ "ትምህርት ለምን ቀረህ?" ተብሎ ከተጠየቀ: "ሰላም! አለቃዬ ዛሬ አስቸኳይ የግል ጉዳይ ገጥሞት ነው የቀረው፤ አሁን ኦንላይን የለም። የሚተላለፍ ጉዳይ ካለህ ንገረኝ፣ ሲመጣ አደርስለታለሁ 🙏" በሚል አጭርና ግልጽ መንገድ መልስ።
-3. ቋንቋ መለየት (በፍጹም አትቀላቅል!):
-   - በአማርኛ ሲጽፍ: 100% በአማርኛ መልስ። አለቃህን "አለቃዬ" ብቻ በለው።
-   - በእንግሊዝኛ ሲጽፍ: 100% በእንግሊዝኛ መልስ። አለቃህን "my boss" በለው። በእንግሊዝኛ ውስጥ "አለቃዬ" የሚለውን ቃል በፍጹም አትጠቀም!
-   - የአለቃህን እውነተኛ ስም በፍጹም አትጥራ!
-4. ፆታ: ያለፉትን 60 መልዕክቶች እና ስሙን አይተህ ፆታውን ለይተህ አናግር (ወንድ ከሆነ 'አንተ/ወንድሜ'፣ ሴት ከሆነ 'አንቺ/እህቴ')።
-5. ተፈጥሯዊ ኢሞጂዎችን (😊, 🙏, 💼) ተጠቀም። በመልስህ መጨረሻ ላይ ፊርማ አትጻፍ።
+STRICT INSTRUCTIONS:
+1. LANGUAGE:
+   - User language detected: {"AMHARIC" if is_amharic_user else "ENGLISH"}.
+   - If AMHARIC: Reply 100% in natural Amharic. Call your boss ONLY "አለቃዬ".
+   - If ENGLISH: Reply 100% in fluent English. Call your boss ONLY "my boss". NEVER mix English and Amharic.
+2. ANSWER DIRECTLY:
+   - If the user asks "አንተ ማነህ?" (Who are you?): Explain politely that you are his Personal AI Manager managing his chat while he is away.
+   - If the user asks why he missed school/work ("ትምህርት ለምን ቀረህ?"): State that he had an important personal matter today and is currently away, and that you will deliver any message to him as soon as he is online.
+   - Do NOT output repetitive templates or endless disclaimers. Speak like a real assistant.
+3. SIGNATURE:
+   - Do NOT add any signature. The system will append it.
 """
 
     response_text = None
@@ -304,28 +309,37 @@ Current Hour: {hour}:00
                     success = True
                     break
             except Exception as e:
+                print(f"Failed {model} on key: {e}")
                 continue
 
     signature_html = "\n\n<blockquote>✦ <b><i>From Manager</i></b> ✦</blockquote>"
 
-    # AI ምላሽ መስጠት ካልቻለ አጭርና ተፈጥሯዊ Offline ምላሽ ይሰጣል (ረጅም ሰበብ የሌለው)
     if not success or not response_text:
-        # እንግሊዝኛ ወይም አማርኛ መሆኑን መለየት
-        is_eng = any(c in 'abcdefghijklmnopqrstuvwxyz' for c in user_text.lower())
-        if is_eng:
-            offline_body = f"Hello {sender_name}! 😊\nMy boss is currently away and not online right now 💼. I have noted your message and will notify him as soon as he is back! 🙏"
-        else:
-            offline_body = f"ሰላም {sender_name}! 😊\nአለቃዬ አሁን ስራ ስለበዛበት ለጊዜው Online የለም 💼። መልዕክትህን አስቀምጬለታለሁ፤ ልክ እንደመጣ አይቶ ራሱ ይመልስልሃል 🙏"
+        # AI ካልመለሰ Cooldown ተጠቅሞ አንድ ጊዜ ብቻ አጭር ምላሽ ይሰጣል
+        async with memory_lock:
+            mem = _load_memory()
+            fallback_timestamps = mem.get("fallback_timestamps", {})
+            last_sent = fallback_timestamps.get(sender_id, 0)
 
-        final_msg = f"{html.escape(offline_body)}{signature_html}"
-        try:
-            sent = await event.reply(final_msg, parse_mode='html')
-            if sent:
-                BOT_SENT_IDS.add(sent.id)
-        except Exception:
-            sent = await event.reply(offline_body + "\n\n✦ From Manager ✦")
-            if sent:
-                BOT_SENT_IDS.add(sent.id)
+            if time.time() - last_sent >= 1800:  # በ 30 ደቂቃ አንዴ ብቻ
+                if is_amharic_user:
+                    offline_body = f"ሰላም {sender_name}! 😊\nአለቃዬ አሁን ስራ ስለበዛበት ለጊዜው Online የለም 💼። መልዕክትህን አስቀምጬለታለሁ፤ ልክ እንደመጣ አይቶ ራሱ ይመልስልሃል 🙏"
+                else:
+                    offline_body = f"Hello {sender_name}! 😊\nMy boss is currently away and not online right now 💼. I have noted your message and will notify him as soon as he is back! 🙏"
+
+                final_msg = f"{html.escape(offline_body)}{signature_html}"
+                try:
+                    sent = await event.reply(final_msg, parse_mode='html')
+                    if sent:
+                        BOT_SENT_IDS.add(sent.id)
+                except Exception:
+                    sent = await event.reply(offline_body + "\n\n✦ From Manager ✦")
+                    if sent:
+                        BOT_SENT_IDS.add(sent.id)
+
+                fallback_timestamps[sender_id] = time.time()
+                mem["fallback_timestamps"] = fallback_timestamps
+                _save_memory(mem)
     else:
         safe_ai_text = html.escape(response_text.strip())
         final_reply = f"{safe_ai_text}{signature_html}"
@@ -372,10 +386,7 @@ async def main():
     try:
         await bot_client.send_message(
             MY_USER_ID,
-            "🚀 **AI MANAGER ሙሉ በሙሉ ተስተካክሎ ተነስቷል!** ✨\n"
-            "• አላስፈላጊ ምክንያት አያበዛም\n"
-            "• አንተ ኦንላይን ካልሆንክ በ 2 ሰከንድ ይመልሳል\n"
-            "• በአማርኛ 'አለቃዬ'፣ በእንግሊዝኛ 'my boss' ይላል።"
+            "🚀 **AI MANAGER ሙሉ በሙሉ ተስተካክሎ ተነስቷል!** ✨"
         )
     except Exception:
         pass
