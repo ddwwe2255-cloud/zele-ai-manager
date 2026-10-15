@@ -28,6 +28,9 @@ SESSION_STRING = os.getenv('SESSION_STRING', '')
 BOT_TOKEN = os.getenv('BOT_TOKEN', '')
 MY_USERNAME = os.getenv('MY_USERNAME', '@zele1216')
 
+raw_keys = os.getenv('GEMINI_API_KEYS', '')
+GEMINI_KEYS = [k.strip() for k in raw_keys.split(',') if k.strip()]
+
 # ==========================================
 # 2. Persistent Memory & State Locks
 # ==========================================
@@ -42,8 +45,10 @@ BOSS_REACTED_MSGS = set()
 IS_BOT_SENDING = False
 
 DEFAULT_PERSONA = (
-    "You are Abel, the sharp, charismatic, deeply intelligent, and professional Personal Manager of Zelalem. "
-    "You NEVER call yourself an AI, bot, robot, Gemini, ChatGPT, or Claude. You speak like a brilliant, warm human manager."
+    "You are Abel (አቤል), the sharp, charismatic, witty, and street-smart Personal Manager of Zelalem (ዘላለም). "
+    "You speak fluently in natural, engaging, and friendly Amharic (አራዳና ማራኪ አማርኛ). "
+    "You understand context deeply: if someone talks about Telebirr, money, payments, or screenshots, you talk about money/payments, NEVER about coding or forex. "
+    "You are warm, helpful, and concise."
 )
 
 def _load_memory():
@@ -83,13 +88,13 @@ def _save_memory(data):
 _save_memory(_load_memory())
 
 # ==========================================
-# 3. Flask Server (For 24/7 UptimeRobot)
+# 3. Flask Server
 # ==========================================
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "ABEL - Personal Manager of Zelalem is Running 24/7!", 200
+    return "ABEL - Final Contextual Manager is Running 24/7!", 200
 
 def run_server():
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), use_reloader=False)
@@ -116,47 +121,37 @@ ROLE_DEFINITIONS = {
     "crush": {
         "title": "❤️ ድብቅ ፍቅረኛ / የምታፈቅራት (Secret Mutual Love)",
         "gender": "female (ሴት)",
-        "prompt": "CRITICAL VIP: She is Zelalem's secret mutual love/crush. Treat her with extraordinary sweetness, tenderness, charm, and deep care. Make her feel super special and valued!"
+        "prompt": "CRITICAL VIP: She is Zelalem's secret mutual love. Treat her with extraordinary sweetness, charm, and deep playful care."
     },
     "bestie_f": {
         "title": "😜 ሴት Best Friend (Playful & Special)",
         "gender": "female (ሴት)",
-        "prompt": "CRITICAL VIP: She is Zelalem's Female Best Friend. Be super playful, teasing, witty, fun, lively, and warm! Use charming banter and make her smile!"
+        "prompt": "CRITICAL VIP: She is Zelalem's Female Best Friend. Be super playful, teasing, witty, fun, and lively!"
     },
     "bestie_m": {
         "title": "😎 ወንድ Best Friend (የልብ አራዳ ጓደኛ)",
         "gender": "male (ወንድ)",
-        "prompt": "CRITICAL VIP: He is Zelalem's Male Best Friend. Use cool brotherhood energy—witty, chill, loyal, supportive, and fun!"
+        "prompt": "CRITICAL VIP: He is Zelalem's Male Best Friend. Use cool brotherhood energy—chill, loyal, and witty."
     },
     "friend_f": {
-        "title": "😊🌸 መደበኛ ሴት ጓደኛ (Normal Female Friend)",
+        "title": "😊🌸 መደበኛ ሴት ጓደኛ",
         "gender": "female (ሴት)",
-        "prompt": "RELATIONSHIP: She is Zelalem's normal female friend. Address her politely in feminine form, be friendly, warm, respectful, and engaging."
+        "prompt": "RELATIONSHIP: Normal female friend. Be friendly, warm, and engaging."
     },
     "friend_m": {
-        "title": "😊👊 መደበኛ ወንድ ጓደኛ (Normal Male Friend)",
+        "title": "😊👊 መደበኛ ወንድ ጓደኛ",
         "gender": "male (ወንድ)",
-        "prompt": "RELATIONSHIP: He is Zelalem's normal male friend. Address him in masculine form, be friendly, smart, respectful, and helpful."
+        "prompt": "RELATIONSHIP: Normal male friend. Be friendly, smart, and helpful."
     },
     "family_f": {
-        "title": "🙏❤️ ሴት ቤተሰብ (እህት / እናት / ዘመድ)",
+        "title": "🙏❤️ ሴት ቤተሰብ",
         "gender": "female (ሴት)",
-        "prompt": "VIP FAMILY: She is Zelalem's beloved female family member. Show the highest level of love, honor, warmth, and respect."
+        "prompt": "VIP FAMILY: Beloved female family member. Show highest honor and warmth."
     },
     "family_m": {
-        "title": "🙏✨ ወንድ ቤተሰብ (ወንድም / አባት / ዘመድ)",
+        "title": "🙏✨ ወንድ ቤተሰብ",
         "gender": "male (ወንድ)",
-        "prompt": "VIP FAMILY: He is Zelalem's beloved male family member. Show the highest level of honor, respect, warmth, and care."
-    },
-    "new_f": {
-        "title": "✨🌸 አዲስ ሴት (አዲስ የተዋወቅካት ሴት)",
-        "gender": "female (ሴት)",
-        "prompt": "RELATIONSHIP: New female acquaintance. Be extra welcoming, polite, charismatic, and impressive."
-    },
-    "new_m": {
-        "title": "🤝✨ አዲስ ወንድ (አዲስ የተዋወቅከው ወንድ)",
-        "gender": "male (ወንድ)",
-        "prompt": "RELATIONSHIP: New male acquaintance. Be professional, welcoming, sharp, and respectful."
+        "prompt": "VIP FAMILY: Beloved male family member. Show highest honor and respect."
     }
 }
 
@@ -164,34 +159,23 @@ def build_person_menu_text(person_name):
     cmd = person_name.lower().replace(" ", "")
     return (
         f"🎯 **«{person_name}» ለአንተ ምን አይነት ጓደኛ እንደሆነ/እንደሆነች መምረጫ ዝርዝር፦**\n\n"
-        f"👩 **ለሴት (Female Options)፦**\n"
         f"• `/{cmd} crush` — ድብቅ ፍቅረኛ (❤️)\n"
         f"• `/{cmd} bestie_f` — ሴት Best Friend (😜)\n"
-        f"• `/{cmd} friend_f` — Normal ሴት ጓደኛ (😊🌸)\n"
-        f"• `/{cmd} family_f` — ሴት ቤተሰብ (🙏❤️)\n"
-        f"• `/{cmd} new_f` — አዲስ ሴት (✨🌸)\n\n"
-        f"👨 **ለወንድ (Male Options)፦**\n"
         f"• `/{cmd} bestie_m` — ወንድ Best Friend (😎)\n"
+        f"• `/{cmd} friend_f` — Normal ሴት ጓደኛ (😊🌸)\n"
         f"• `/{cmd} friend_m` — Normal ወንድ ጓደኛ (😊👊)\n"
-        f"• `/{cmd} family_m` — ወንድ ቤተሰብ (🙏✨)\n"
-        f"• `/{cmd} new_m` — አዲስ ወንድ (🤝✨)"
+        f"• `/{cmd} family_f` — ሴት ቤተሰብ (🙏❤️)\n"
+        f"• `/{cmd} family_m` — ወንድ ቤተሰብ (🙏✨)"
     )
 
 @bot_client.on(events.NewMessage(pattern='/start'))
 async def bot_start(event):
     await event.reply(
-        "👋 **ሰላም አለቃዬ ዘላለም! እኔ አቤል (Abel) ነኝ — የአንተ የግል ማኔጀር።** 💼✨\n\n"
-        "🌍 **ለሁሉም ሰው በአንድ ጊዜ መመሪያ ለመስጠት (ኮድ ሳትነካ)፦**\n"
-        "• `/all [መመሪያ]` — ለሁሉም ሰው የሚሰራ አጠቃላይ ህግ ለመጨመር\n"
-        "• `/clear_all` — አጠቃላይ ህጉን ለማጽዳት\n\n"
-        "🥷 **የጓደኛ ስምና አይነት መመዝገቢያ፦**\n"
-        "1️⃣ በሰውየው ቻት ላይ `/name zufan` ብለህ ላክ (በ0.1 ሰከንድ ይጠፋል)።\n"
-        "2️⃣ እዚህ ቦት ላይ `/zufan` ብለህ የጓደኝነት አይነቱን ምረጥ።\n\n"
-        "⚙️ **ሌሎች ትዕዛዞች፦**\n"
-        "📋 `/vips` — የተመዘገቡ ጓደኞችን ለማየት\n"
-        "🔴 `/away` — እኔ የለሁም (በ 2 ሰከንድ እንድመልስ)\n"
-        "🟢 `/online` — መደበኛ ሁኔታ\n"
-        "📊 `/report` — የመጡ መልዕክቶችን ሪፖርት ለማየት"
+        "👋 **ሰላም አለቃዬ ዘላለም! አቤል (Abel) በፍጹም ተስተካክሎ ተነስቷል!** 💼✨\n\n"
+        "🥷 **የጓደኛ ስም ለመመዝገብ፦**\n"
+        "1️⃣ በሰውየው ቻት ላይ `/name [ስም]` ብለህ ላክ (በ0.1 ሰከንድ ይጠፋል)።\n"
+        "2️⃣ እዚህ ቦት ላይ `/[ስም]` ብለህ የጓደኝነት አይነቱን ምረጥ።\n\n"
+        "⚙️ **መቆጣጠሪያዎች:** `/online`, `/away`, `/report`, `/vips`"
     )
 
 @bot_client.on(events.NewMessage(pattern=r'^/all\s+(.+)'))
@@ -201,18 +185,7 @@ async def set_global_rule(event):
         mem = _load_memory()
         mem["global_rule"] = rule_text
         _save_memory(mem)
-    await event.reply(
-        f"✅ **ለሁሉም ሰው የሚሰራ አጠቃላይ መመሪያ ተመዝግቧል!** 🌍✨\n"
-        f"📝 መመሪያ፦ _{rule_text}_"
-    )
-
-@bot_client.on(events.NewMessage(pattern='/clear_all$'))
-async def clear_global_rule(event):
-    async with memory_lock:
-        mem = _load_memory()
-        mem["global_rule"] = ""
-        _save_memory(mem)
-    await event.reply("✅ አጠቃላይ መመሪያው ጸድቷል!")
+    await event.reply(f"✅ አጠቃላይ መመሪያ ተመዝግቧል: _{rule_text}_")
 
 @bot_client.on(events.NewMessage(pattern='/vips$'))
 async def list_vips_cmd(event):
@@ -220,14 +193,13 @@ async def list_vips_cmd(event):
         mem = _load_memory()
         vips = mem.get("vips", {})
     if not vips:
-        await event.reply("📭 እስካሁን የተመዘገበ ሰው የለም። በቻት ላይ `/name zufan` ብለህ ጀምር!")
+        await event.reply("📭 እስካሁን የተመዘገበ ሰው የለም። በቻት ላይ `/name [ስም]` ብለህ ጀምር!")
         return
-    txt = "👑 **የተመዘገቡ ጓደኞችና የሚጠሩበት ስም፦**\n\n"
+    txt = "👑 **የተመዘገቡ ጓደኞች፦**\n\n"
     for uid, v in vips.items():
         c_name = v.get("call_name", "ጓደኛ")
         r_key = v.get("role", "friend_m")
-        r_title = ROLE_DEFINITIONS.get(r_key, {}).get("title", r_key)
-        txt += f"• **{c_name}** ➔ {r_title}\n"
+        txt += f"• **{c_name}** ➔ {ROLE_DEFINITIONS.get(r_key, {}).get('title', r_key)}\n"
     await event.reply(txt[:4000])
 
 @bot_client.on(events.NewMessage(pattern='/away$'))
@@ -236,7 +208,7 @@ async def set_away(event):
         mem = _load_memory()
         mem["status"] = "away"
         _save_memory(mem)
-    await event.reply("🔴 ሁኔታህ ወደ **AWAY** ተቀይሯል። አቤል ሳይጠብቅ በ 2 ሰከንድ ውስጥ ይመልሳል! ⚡")
+    await event.reply("🔴 ሁኔታህ ወደ **AWAY** ተቀይሯል።")
 
 @bot_client.on(events.NewMessage(pattern='/online$'))
 async def set_online(event):
@@ -252,9 +224,9 @@ async def get_report(event):
         mem = _load_memory()
         missed = mem.get("missed", [])
     if not missed:
-        await event.reply("📭 በአሁኑ ሰዓት አዲስ ሪፖርት የለም አለቃዬ።")
+        await event.reply("📭 አዲስ ሪፖርት የለም አለቃዬ።")
         return
-    text = "📊 **አቤል የተቀበላቸው መልዕክቶች ሪፖርት:**\n\n"
+    text = "📊 **ሪፖርት:**\n\n"
     for m in missed:
         text += f"👤 **{m['name']}**: {m['text']}\n"
     await event.reply(text[:4000])
@@ -285,20 +257,13 @@ async def dynamic_name_command_handler(event):
                     break
 
     if not target_uid:
-        await event.reply(
-            f"❓ **«{cmd_name}»** የሚል ስም ገና አልተመዘገበም!\n"
-            f"መጀመሪያ በሰውየው ቻት ላይ `/name {cmd_name}` ብለህ ላክ።"
-        )
+        await event.reply(f"❓ «{cmd_name}» ገና አልተመዘገበም። በቻት ላይ `/name {cmd_name}` ብለህ ላክ።")
         return
 
     person_info = vips.get(target_uid, {})
     display_name = person_info.get("call_name", cmd_name)
 
-    if not role_arg:
-        await event.reply(build_person_menu_text(display_name))
-        return
-
-    if role_arg not in ROLE_DEFINITIONS:
+    if not role_arg or role_arg not in ROLE_DEFINITIONS:
         await event.reply(build_person_menu_text(display_name))
         return
 
@@ -315,14 +280,10 @@ async def dynamic_name_command_handler(event):
         mem["vips"] = vips
         _save_memory(mem)
 
-    await event.reply(
-        f"✅ **ተሞልቷል አለቃዬ!** 🎉\n"
-        f"👤 ስም፦ **{display_name}**\n"
-        f"🏷 የጓደኝነት አይነት፦ **{role_meta['title']}**"
-    )
+    await event.reply(f"✅ **ተሞልቷል አለቃዬ!** 👤 {display_name} ➔ {role_meta['title']}")
 
 # ==========================================
-# 6. STEALTH IN-CHAT `/name zufan` LISTENER
+# 6. STEALTH IN-CHAT `/name` LISTENER
 # ==========================================
 @user_client.on(events.NewMessage(outgoing=True))
 async def outgoing_and_stealth_name_handler(event):
@@ -362,8 +323,7 @@ async def outgoing_and_stealth_name_handler(event):
         try:
             await bot_client.send_message(
                 MY_USER_ID,
-                f"🥷 **የ«{tg_name}»ን ስም «{custom_name}» ብዬ መዝግቤዋለሁ!**\n\n"
-                + build_person_menu_text(custom_name)
+                f"🥷 **«{tg_name}» ➔ «{custom_name}» ተመዝግቧል!**\n\n" + build_person_menu_text(custom_name)
             )
         except Exception:
             pass
@@ -377,254 +337,66 @@ async def outgoing_and_stealth_name_handler(event):
     LAST_BOSS_CHAT_TIME[event.chat_id] = time.time()
 
 # ==========================================
-# 7. Language & Gender Detection
-# ==========================================
-def normalize_amharic(text):
-    t = text.lower().strip()
-    replacements = {
-        'ዉ': 'ው', 'ሐ': 'ሀ', 'ሑ': 'ሁ', 'ሒ': 'ሂ', 'ሓ': 'ሀ', 'ሔ': 'ሄ', 'ሕ': 'ህ', 'ሖ': 'ሆ',
-        'ኀ': 'ሀ', 'ኁ': 'ሁ', 'ኂ': 'ሂ', 'ኃ': 'ሀ', 'ኄ': 'ሄ', 'ኅ': 'ህ', 'ኆ': 'ሆ',
-        'ሠ': 'ሰ', 'ሡ': 'ሱ', 'ሢ': 'ሲ', 'ሣ': 'ሳ', 'ሤ': 'ሴ', 'ሥ': 'ስ', 'ሦ': 'ሶ',
-        'ዐ': 'አ', 'ዑ': 'ኡ', 'ዒ': 'ኢ', 'ዓ': 'አ', 'ዔ': 'ኤ', 'ዕ': 'እ', 'ዖ': 'ኦ',
-        'ፀ': 'ጸ', 'ፁ': 'ጹ', 'ፂ': 'ጺ', 'ፃ': 'ጻ', 'ፄ': 'ጼ', 'ፅ': 'ጽ', 'ፆ': 'ጾ'
-    }
-    for old_c, new_c in replacements.items():
-        t = t.replace(old_c, new_c)
-    return t
-
-FRANCO_WORDS = {
-    "mndnew", "mndn", "mindinew", "mdnew", "malet", "lemns", "lemn", "lemin",
-    "ytekmal", "yiteqmal", "yitekm", "endet", "endiet", "selam", "slm", "sira",
-    "srah", "sirah", "tmkrt", "tmhrt", "timhirt", "zare", "nege", "ante", "anchi",
-    "maneh", "manes", "manew", "yeserah", "yserah", "et", "yet", "neh", "nesh",
-    "new", "nw", "alh", "aleh", "alesh", "ebakh", "ebakih", "chgr", "chigir",
-    "mfthe", "yichalal", "ychalal", "enchlalen", "mesrat", "msrat", "miknyat",
-    "bzu", "tolo", "mels", "melis", "betam", "konjo", "arif", "gobez", "wendme",
-    "ehte", "fikir", "fkr", "aleka", "alekaye", "mokrlgn", "ahun", "eski"
-}
-
-FEMALE_NAMES_HINTS = {
-    "zufan", "ዙፋን", "adise", "አድሴ", "selam", "ሰላም", "marta", "ማርታ", "betty", "ቤቲ",
-    "helen", "ሄለን", "sara", "ሳራ", "hana", "ሀና", "hanna", "ruth", "ሩት", "tina", "ቲና",
-    "mekdes", "መቅደስ", "kidist", "ቅድስት", "meron", "ሜሮን", "eden", "ኤደን", "bezawit", "ቤዛዊት",
-    "tsion", "ጽዮን", "kalkidan", "ቃልኪዳን", "mahlet", "ማህሌት", "lidya", "ሊዲያ", "rahel", "ራሄል"
-}
-
-MALE_NAMES_HINTS = {
-    "yalew", "ያለው", "abebe", "አበበ", "kebede", "dawit", "ዳዊት", "yonas", "ዮናስ",
-    "henok", "ሄኖክ", "samuel", "ሳሙኤል", "bereket", "በረከት", "daniel", "ዳንኤል",
-    "eyob", "ኢዮብ", "nahom", "ናሆም", "abel", "አቤል", "kaleb", "ካሌብ", "robel", "ሮቤል"
-}
-
-def has_geez(text):
-    return any(0x1200 <= ord(c) <= 0x137F for c in text)
-
-def is_franco_amharic(text):
-    words = set(re.findall(r'[a-zA-Z]+', text.lower()))
-    if words & FRANCO_WORDS:
-        return True
-    patterns = [r'\bmndn', r'\bmdnew', r'\bmalet\b', r'\bytek', r'\blemn', r'\bendet', r'\byeser', r'\bmanew']
-    return any(re.search(p, text.lower()) for p in patterns)
-
-def is_amharic_intent(text):
-    return has_geez(text) or is_franco_amharic(text)
-
-def detect_gender_and_profile(sender_name, history_msgs, vip_info=None):
-    if vip_info and vip_info.get("gender"):
-        return vip_info["gender"], "VIP የተመዘገበ ጓደኛ"
-
-    female_score = 0
-    male_score = 0
-
-    clean_name = (sender_name or "").strip().lower()
-    for fn in FEMALE_NAMES_HINTS:
-        if fn in clean_name:
-            female_score += 5
-    for mn in MALE_NAMES_HINTS:
-        if mn in clean_name:
-            male_score += 5
-
-    female_markers = ["አንቺ", "ነሽ", "ለሽ", "ብለሽ", "እህቴ", "የኔ ቆንጆ", "ውዴ", "ትችያለሽ", "አለሽ", "መጣሽ", "አልሽኝ", "anchi", "nesh", "alesh", "konjo"]
-    male_markers = ["አንተ", "ነህ", "ለህ", "ብለህ", "ወንድሜ", "አራዳ", "ጓደኛዬ", "ትችላለህ", "አለህ", "መጣህ", "አልከኝ", "ante", "neh", "aleh", "wendme", "bro"]
-
-    for m in history_msgs:
-        txt = (getattr(m, 'text', '') or '').lower()
-        if not txt or "From Manager" in txt:
-            continue
-        for fm in female_markers:
-            if fm in txt:
-                female_score += 2
-        for mm in male_markers:
-            if mm in txt:
-                male_score += 2
-
-    gender = "female (ሴት)" if female_score > male_score else "male (ወንድ)"
-    closeness = "በጣም የቅርብ ጓደኛ" if len(history_msgs) > 40 else "ጓደኛ"
-    return gender, closeness
-
-# ==========================================
-# 8. UNIVERSAL ENGLISH-BRIDGE AI ENGINE (100% Pure Amharic for Everyone!)
+# 7. FINAL AI ENGINE WITH STRICT CONTEXT & TELEBIRR AWARENESS
 # ==========================================
 BROWSER_HEADERS = {
     "Content-Type": "application/json",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
 }
 
-def google_neural_translate(text, target_lang="am"):
-    """ጽሑፍን በ100% ንጹህ ሰዋሰው ወደ እንግሊዝኛ ወይም ወደ አማርኛ ይቀይራል"""
-    if not text or not text.strip():
-        return text
-    try:
-        url = "https://translate.googleapis.com/translate_a/single"
-        params = {"client": "gtx", "sl": "auto", "tl": target_lang, "dt": "t", "q": text}
-        res = requests.get(url, params=params, headers=BROWSER_HEADERS, timeout=10)
-        if res.status_code == 200:
-            data = res.json()
-            translated = "".join([part[0] for part in data[0] if part[0]])
-            if target_lang == "am":
-                translated = re.sub(r'የእኔ አለቃ|አለቃዬን|የኔ አለቃ', 'አለቃዬ', translated)
-                translated = re.sub(r'\bAbel\b', 'አቤል', translated, flags=re.IGNORECASE)
-                translated = re.sub(r'\bZelalem\b', 'ዘላለም', translated, flags=re.IGNORECASE)
-            return translated.strip()
-    except Exception:
-        pass
-    return text
-
-def builtin_autonomous_smart_brain(user_text, call_name, use_amharic, is_female, role):
-    norm_t = normalize_amharic(user_text)
-
-    if any(k in norm_t for k in ["can you speak english", "speak english", "do you speak english", "እንግሊዝኛ ትችላለህ", "እንግሊዘኛ"]):
-        if not use_amharic:
-            return f"Yes, of course {call_name}! 😊 I speak fluent English as well as Amharic ✨. My name is Abel, and I am my boss Zelalem's Personal Manager 💼. How can I help you today? 🙏"
-        return f"አዎ {call_name}፣ በሚገባ እችላለሁ! 😊 እንግሊዝኛም ሆነ አማርኛ አቀላጥፌ አወራለሁ ✨። በፈለግከው/ሽው ቋንቋ ልታናግረኝ/ሪኝ ትችላለህ/ያለሽ 💼🙏"
-
-    if any(k in norm_t for k in ["የአለቃህ ስም", "አለቃህ ማነው", "boss's name", "boss name", "alekah sm", "alekah manew"]):
-        if use_amharic:
-            return f"ሰላም {call_name}! 😊 የአለቃዬ ስም **ዘላለም** ይባላል ✨። እኔ ደግሞ የእሱ የግል ማኔጀር **አቤል** ነኝ 💼። ምን ልርዳሽ/ህ? 🙏"
-        return f"Hello {call_name}! 😊 My boss's name is **Zelalem** ✨. I am **Abel**, his Personal Manager 💼. How can I help you today? 🙏"
-
-    if any(k in norm_t for k in [
-        "ስራህ", "ምድነው", "ምንድነው ስራህ", "ስምህ", "ማነህ", "ማነው የሰራህ", "ለምንድነው የተሰራከው",
-        "what is your name", "who are you", "what is your job", "what do you do", "srah", "sirah", "maneh"
-    ]) and not any(topic in norm_t for topic in ["agriculture", "forex", "physics", "software", "ግብርና", "ፊዚክስ"]):
-        if use_amharic:
-            if role == "crush":
-                return f"ሰላም የኔ ልዩ {call_name}! 😊❤️ ስሜ **አቤል** ይባላል ✨። የአለቃዬ የዘላለም የግል ማኔጀር ነኝ 💼። ስራዬ አለቃዬ Online በማይሆንበት ጊዜ እንደ አንቺ ያሉ ልዩ ሰዎችን በክብርና በፍቅር ማስተናገድና ማንኛውንም ጥያቄ መመለስ ነው 🌸🥰"
-            if role == "bestie_f":
-                return f"ሰላም {call_name}ዬ! 😜✨ ስሜ **አቤል** ይባላል፣ የአለቃዬ የዘላለም የግል ማኔጀር ነኝ 💼። ስራዬ አለቃዬ ስራ ሲበዛበት እሱን ተክቼ ከአንቺ ጋር መጫወት፣ ማዝናናትና ማንኛውንም ጥያቄ መመለስ ነው 😊🔥"
-            if is_female:
-                return f"ሰላም {call_name}! 😊 ስሜ **አቤል** ይባላል ✨። ስራዬ የአለቃዬ የዘላለም የግል ማኔጀር (Personal Manager) መሆን ነው 💼። እሱ Online በማይሆንበት ሰዓት መልዕክቶችን እቀበላለሁ፣ ማንኛውንም ጥያቄም ወዲያውኑ እመልሳለሁ። ምን ልርዳሽ? 🙏"
-            return f"ሰላም {call_name}! 😊 ስሜ **አቤል** ይባላል ✨። ስራዬ የአለቃዬ የዘላለም የግል ማኔጀር (Personal Manager) መሆን ነው 💼። እሱ Online በማይሆንበት ሰዓት መልዕክቶችን እቀበላለሁ፣ ማንኛውንም ጥያቄም ወዲያውኑ እመልሳለሁ። ምን ልርዳህ? 🙏"
-        else:
-            return f"Hello {call_name}! 😊 My name is **Abel** ✨. My job is serving as my boss Zelalem's Personal Manager—handling his messages, chatting with his friends, and answering any questions while he is away 💼. How can I help you? 🙏"
-
-    if norm_t in ["hi", "hello", "hey", "selam", "slm", "ሰላም", "ሃይ", "ሀይ", "እንዴት ነህ", "endet neh"]:
-        if use_amharic:
-            if role == "crush":
-                return f"ሰላም {call_name}ዬ! 😊❤️ እንኳን ደህና መጣሽ ✨። እኔ አቤል ነኝ፣ የአለቃዬ ማኔጀር 💼። አለቃዬ ለጊዜው Online የለም ግን የአንቺን መልዕክት ሲያይ በጣም ይደሰታል 🌸። እስኪመጣ ድረስ ምን ልርዳሽ? 🥰"
-            if role == "bestie_f":
-                return f"ሰላም {call_name}ዬ! 😜✨ እኔ አቤል ነኝ፣ የአለቃዬ ማኔጀር 💼። አለቃዬ ለጊዜው ወጣ ብሏል ግን እኔ አለሁልሽ! ንገሪኝ እስኪ ምን አዲስ ወሬ አለ? 😊🔥"
-            return f"ሰላም {call_name}! 😊 እኔ አቤል ነኝ፣ የአለቃዬ የግል ማኔጀር 💼። አለቃዬ ለጊዜው Online የለም፤ ማንኛውም ጥያቄ ወይም ጉዳይ ካለህ/ሽ ግን እኔን መጠየቅ ትችላለህ/ያለሽ! ✨🙏"
-        return f"Hello {call_name}! 😊 I am Abel, my boss's Personal Manager 💼. My boss is currently away, so feel free to ask me any question or leave a message! ✨🙏"
-
-    return None
-
 def is_valid_reply(ans):
     if not ans or len(ans.strip()) < 2:
         return False
-    bad = ["<!doctype", "<html", "rate limit", "too many requests", "502 bad gateway", "internal server error", "cloudflare", "error 52"]
+    bad = ["<!doctype", "<html", "rate limit", "too many requests", "502 bad gateway", "internal server error", "cloudflare"]
     return not any(b in ans.lower() for b in bad)
 
-def call_universal_clean_ai(system_rules, chat_context, user_text, call_name, use_amharic, is_female, role):
-    """
-    ለሁሉም ሰው በራሱ የሚሰራ ሲስተም፦
-    1. ጥያቄውንና ውይይቱን መጀመሪያ ወደ እንግሊዝኛ ይቀይረዋል (AIው የአማርኛ ፊደል አይቶ የተሰባበረ አማርኛ እንዳይጽፍ!)
-    2. AIው 100% በእንግሊዝኛ ያስባል፣ በእንግሊዝኛ ይመልሳል።
-    3. መልሱን ወዲያውኑ በ Google Neural Translate ወደ 100% ንጹህ አማርኛ ይቀይረዋል!
-    """
-    instant = builtin_autonomous_smart_brain(user_text, call_name, use_amharic, is_female, role)
-    if instant:
-        return instant
+def call_final_context_ai(system_rules, chat_context, user_text, call_name):
+    messages = [
+        {"role": "system", "content": system_rules},
+        {"role": "user", "content": f"[Full Conversation History]\n{chat_context}\n\n[Latest Message / Photo Context from {call_name}]: {user_text}\n\nRespond directly as Abel in natural, smooth Amharic (አራዳና ማራኪ አማርኛ):"}
+    ]
 
-    # 1. የአማርኛ ፊደላትን ወደ እንግሊዝኛ እንቀይራለን (AIው በፍጹም የአማርኛ ፊደል እንዳያይ!)
-    en_user_text = google_neural_translate(user_text, "en") if has_geez(user_text) else user_text
-    en_context = google_neural_translate(chat_context, "en") if has_geez(chat_context) else chat_context
-    en_call_name = google_neural_translate(call_name, "en") if has_geez(call_name) else call_name
+    for attempt in range(3):
+        if attempt > 0:
+            time.sleep(1.5)
+        seed_val = random.randint(1000, 999999)
 
-    strict_en_system = (
-        f"{system_rules}\n"
-        "CRITICAL GLOBAL RULE FOR ALL USERS:\n"
-        "- You MUST write your entire response 100% in clear, natural ENGLISH words only (ASCII characters + emojis).\n"
-        "- NEVER output any Amharic/Ge'ez characters yourself, because our Neural Translator will translate your English response into fluent Amharic automatically!\n"
-        "- Directly address the user's topic or question in 2 to 3 natural sentences, ending sentences with 1-2 fitting emojis."
-    )
-
-    en_user_prompt = f"[Recent Chat in English]\n{en_context}\n\n[Message from {en_call_name}]: {en_user_text}"
-
-    english_reply = None
-
-    # Method 1: Fast GET Endpoint
-    for attempt in range(2):
-        try:
-            seed_val = random.randint(1000, 999999)
-            compact_q = f"{strict_en_system}\n\n{en_user_prompt}\nAbel's English Reply:"
-            encoded_q = urllib.parse.quote(compact_q[:1300])
-            res_get = requests.get(
-                f"https://text.pollinations.ai/{encoded_q}?model=openai&seed={seed_val}",
-                headers=BROWSER_HEADERS,
-                timeout=16
-            )
-            if res_get.status_code == 200 and is_valid_reply(res_get.text):
-                candidate = res_get.text.strip()
-                # ድንገት የአማርኛ ፊደል ከቀላቀለበት እናጸዳለን
-                if not has_geez(candidate):
-                    english_reply = candidate
-                    break
-        except Exception:
-            pass
-        time.sleep(1.0)
-
-    # Method 2: POST OpenAI Endpoint
-    if not english_reply:
-        messages = [
-            {"role": "system", "content": strict_en_system},
-            {"role": "user", "content": en_user_prompt}
-        ]
-        for model_name in ["openai", "openai-large"]:
+        for model_name in ["openai-large", "openai", "mistral"]:
             try:
-                seed_val = random.randint(1000, 999999)
-                res_post = requests.post(
+                res = requests.post(
                     "https://text.pollinations.ai/openai",
                     headers=BROWSER_HEADERS,
-                    json={"model": model_name, "messages": messages, "seed": seed_val, "temperature": 0.6},
-                    timeout=18
+                    json={
+                        "model": model_name,
+                        "messages": messages,
+                        "seed": seed_val,
+                        "temperature": 0.65
+                    },
+                    timeout=22
                 )
-                if res_post.status_code == 200:
-                    candidate = res_post.json()["choices"][0]["message"]["content"].strip()
-                    if is_valid_reply(candidate):
-                        english_reply = candidate
-                        break
+                if res.status_code == 200:
+                    ans = res.json()["choices"][0]["message"]["content"].strip()
+                    if is_valid_reply(ans):
+                        return ans
             except Exception:
                 pass
 
-    # 3. የተገኘውን ብልህ የእንግሊዝኛ መልስ ወደ 100% ንጹህ አማርኛ እንተረጉማለን!
-    if english_reply:
-        if use_amharic:
-            clean_amharic = google_neural_translate(english_reply, "am")
-            return clean_amharic
-        return english_reply
+        try:
+            res = requests.post(
+                "https://text.pollinations.ai/",
+                headers=BROWSER_HEADERS,
+                json={"messages": messages, "model": "openai", "seed": seed_val, "private": True},
+                timeout=22
+            )
+            if res.status_code == 200 and is_valid_reply(res.text):
+                return res.text.strip()
+        except Exception:
+            pass
 
-    # 4. Self-Healing Backup (ኢንተርኔት ቢዘገይ እንኳ ንጹህ መልስ ይሰጣል)
-    if use_amharic:
-        if role == "crush":
-            return f"የኔ ልዩ {call_name} ❤️✨፣ የጻፍሽልኝን መልዕክት በክብር አይቼዋለሁ 😊። አለቃዬ ዘላለም ልክ Online ሲገባ መልዕክትሽን ቀድሜ አሳየዋለሁ 🌸🥰🙏"
-        if role == "bestie_f":
-            return f"ሰላም {call_name}ዬ! 😜✨ መልዕክትሽ ደርሶኛል 😊። አለቃዬ ዘላለም አሁን ትንሽ ስራ ይዞት ወጣ ብሏል፣ ልክ ሲመለስ የጻፍሽውን አሳየዋለሁ 🔥🙏"
-        return f"ሰላም {call_name}! 😊 እኔ አቤል ነኝ (የአለቃዬ የዘላለም ማኔጀር) 💼። የላክከውን/ሽውን ጉዳይ በሚገባ መዝግቤ ይዤዋለሁ ✨፤ አለቃዬ ልክ Online ሲገባ ወዲያውኑ አሳውቀውና በራሱ ይመልስልሃል/ሻል 🙏👊"
-    return f"Hello {call_name}! 😊 I am Abel, my boss Zelalem's Personal Manager 💼. I have noted your message and will make sure my boss gets back to you as soon as he is online ✨🙏!"
+    return f"ሰላም {call_name}! 😊 የጻፍሽውን/ከውን መልዕክት ተረድቻለሁ፤ አለቃዬ ዘላለም ልክ Online ሲገባ ወዲያውኑ አሳውቀዋለሁ 💼✨።"
 
 # ==========================================
-# 9. USERBOT CORE (Online/Offline & Reaction 🫡 Lock)
+# 8. USERBOT CORE (Strict 5-Min Boss In-Chat Lock & Reaction 🫡 Guard)
 # ==========================================
 def is_bot_message(msg):
     if not msg:
@@ -682,16 +454,19 @@ async def did_boss_handle_chat(chat_id, incoming_msg_id):
         pass
     return False
 
-async def is_boss_live_online(current_status):
+async def is_boss_live_online(chat_id, current_status):
     if current_status == "away":
         return False
+    # ባለፉት 5 ደቂቃዎች ውስጥ በዚህ ቻት ውስጥ አለቃው ጽፎ ከሆነ ቦቱ በፍጹም ጣልቃ አይገባም!
+    if (time.time() - LAST_BOSS_CHAT_TIME.get(chat_id, 0)) < 300:
+        return True
     try:
         me = await user_client.get_me()
         if me and isinstance(getattr(me, 'status', None), UserStatusOnline):
             return True
     except Exception:
         pass
-    if (time.time() - LAST_BOSS_ACTIVE_TIME) < 35:
+    if (time.time() - LAST_BOSS_ACTIVE_TIME) < 40:
         return True
     return False
 
@@ -715,10 +490,11 @@ async def auto_manager(event):
             return
         current_status = mem.get("status", "online")
 
-    boss_online = await is_boss_live_online(current_status)
+    boss_online = await is_boss_live_online(event.chat_id, current_status)
 
     if boss_online:
-        for _ in range(30):
+        # አንተ በቻቱ ውስጥ ንቁ ከሆንክ እስከ 5 ደቂቃ ድረስ እንጠብቃለን፤ አንተ ስትመልስ ቦቱ ሙሉ በሙሉ ዝም ይላል!
+        for _ in range(75):
             await asyncio.sleep(4)
             if await did_boss_handle_chat(event.chat_id, msg_id):
                 async with memory_lock:
@@ -726,7 +502,7 @@ async def auto_manager(event):
                     mem.setdefault("processed_ids", []).append(msg_id)
                     _save_memory(mem)
                 return
-            if not await is_boss_live_online(current_status):
+            if not await is_boss_live_online(event.chat_id, current_status):
                 break
         try:
             await event.mark_read()
@@ -750,22 +526,23 @@ async def auto_manager(event):
         mem.setdefault("processed_ids", []).append(msg_id)
         _save_memory(mem)
 
-    user_text = event.text or "[ፎቶ/ሚዲያ ተልኳል]"
+    user_text = event.text or "[ፎቶ/ሚዲያ (እንደ ቴሌብር ደረሰኝ ወይም ስክሪንሾት ተልኳል)]"
     short_msg = (user_text[:45] + '..') if len(user_text) > 45 else user_text
 
-    hist_150 = []
+    # Up to 200-Message Deep Scan
+    hist_200 = []
     chat_context = ""
     try:
-        hist_150 = await user_client.get_messages(event.chat_id, limit=150)
+        hist_200 = await user_client.get_messages(event.chat_id, limit=200)
         context_lines = []
-        for m in reversed(hist_150[:15]):
+        for m in reversed(hist_200):
             if not m or not m.text:
                 continue
-            speaker = "Abel" if is_bot_message(m) else ("Zelalem" if m.out else raw_sender_name)
+            speaker = "Abel" if is_bot_message(m) else ("Zelalem (Boss)" if m.out else raw_sender_name)
             clean_txt = m.text.replace("✦ From Manager ✦", "").replace("✦ 𝙁𝙧𝙤𝙢 𝙈𝙖𝙣𝙖𝙜𝙚𝙧 ✦", "").strip()
             if clean_txt:
                 context_lines.append(f"{speaker}: {clean_txt}")
-        chat_context = "\n".join(context_lines)
+        chat_context = "\n".join(context_lines[-200:])
     except Exception:
         pass
 
@@ -773,8 +550,6 @@ async def auto_manager(event):
         mem = _load_memory()
         vips = mem.get("vips", {})
         vip_info = vips.get(sender_id)
-
-        detected_gender, closeness_level = detect_gender_and_profile(raw_sender_name, hist_150, vip_info)
 
         if vip_info and vip_info.get("call_name"):
             call_name = vip_info["call_name"]
@@ -787,25 +562,23 @@ async def auto_manager(event):
 
     role = vip_info.get("role", "normal") if vip_info else "normal"
     custom_note = vip_info.get("note", "") if vip_info else ""
-    is_female = "female" in detected_gender
 
     if role in ROLE_DEFINITIONS:
         relationship_guide = f"{ROLE_DEFINITIONS[role]['prompt']} Always address them by name as '{call_name}'. {custom_note}"
     else:
-        relationship_guide = f"Sender's name: '{call_name}'. Gender: {detected_gender}. Relationship: {closeness_level}. Be charismatic, smart, polite, and helpful."
-
-    use_amharic = is_amharic_intent(user_text) or (not any(c.isalpha() for c in user_text) and has_geez(chat_context))
+        relationship_guide = f"Sender's name: '{call_name}'. Be charismatic, smart, polite, and engaging."
 
     system_rules = f"""
 {persona}
-{f"ADDITIONAL GLOBAL RULE: {global_rule}" if global_rule else ""}
+{f"GLOBAL RULE: {global_rule}" if global_rule else ""}
 
-IDENTITY & CONTEXT:
-- Your Name: Abel.
-- Your Job: Personal Manager of your boss Zelalem.
-- User's Name: "{call_name}" ({detected_gender}).
-- {relationship_guide}
-- Respond directly and intelligently to what "{call_name}" is talking about (whether it is Software Engineering, Bots, Forex, Agriculture, School, or casual chat).
+STRICT INSTRUCTIONS:
+1. IDENTITY: Your name is Abel. You are Zelalem's Personal Manager. NEVER call yourself an AI or bot.
+2. CONTEXT AWARENESS (CRITICAL): Read the conversation history. If the user talks about Telebirr, money, payments, screenshots, debts, or daily life, talk ONLY about money/payments/daily life. NEVER talk about coding, programming, or forex unless explicitly asked about them!
+3. LANGUAGE: Respond in smooth, natural Amharic (አራዳና ማራኪ አማርኛ).
+4. USER NAME: Address the user as "{call_name}".
+5. {relationship_guide}
+6. Keep replies concise (2-4 sentences) with 1-2 fitting emojis. No signature at the end.
 """
 
     signature_html = "\n\n<blockquote>✦ <b><i>From Manager</i></b> ✦</blockquote>"
@@ -817,8 +590,8 @@ IDENTITY & CONTEXT:
         IS_BOT_SENDING = True
         try:
             response_text = await asyncio.to_thread(
-                call_universal_clean_ai,
-                system_rules, chat_context, user_text, call_name, use_amharic, is_female, role
+                call_final_context_ai,
+                system_rules, chat_context, user_text, call_name
             )
 
             clean_reply = response_text.replace("✦ From Manager ✦", "").strip()
@@ -851,7 +624,7 @@ IDENTITY & CONTEXT:
             IS_BOT_SENDING = False
 
 # ==========================================
-# 10. Connection Keep-Alive
+# 9. Connection Keep-Alive
 # ==========================================
 async def keep_connection_alive():
     while True:
@@ -874,19 +647,25 @@ async def main():
     try:
         await bot_client.send_message(
             MY_USER_ID,
-            "🚀 **አቤል (Universal Clean Amharic) ተነስቷል!** 💼✨\n\n"
-            "✅ **ለሁሉም ሰው በራሱ ተስተካክሏል፦**\n"
-            "• ከአሁን በኋላ ለእያንዳንዱ ሰው የቋንቋ ህግ መጻፍ አይጠበቅብህም!\n"
-            "• ማንኛውም ሰው ሲጽፍ ጥያቄውን ወደ እንግሊዝኛ ቀይሬ ካሰብኩ በኋላ ወደ **100% ንጹህ አማርኛ** ተርጉሜ እመልሳለሁ።\n"
-            "• ወደፊት ለሁሉም ሰው አዲስ ትዕዛዝ መስጠት ብትፈልግ እዚሁ ቦት ላይ `/all [መመሪያ]` ማለት ትችላለህ!"
+            "🚀 **አቤል (Final Telebirr & 5-Min Boss Lock Engine) ተነስቷል!** 💼✨\n\n"
+            "• የቴሌብር ደረሰኝ እና የገንዘብ ሐሳቦች ሲመጡ ኮዲንግ ወይም ፎርክስ እያቀባጠረ ማውራት ሙሉ በሙሉ ጠፍቷል!\n"
+            "• አንተ በቻት ላይ active ስትሆን እስከ 5 ደቂቃ ድረስ ቦቱ ፍጹም ዝም ይላል (አንተ ከመለስክ ጨርሶ አይገባም)።"
         )
     except Exception:
         pass
 
-    await asyncio.gather(
-        user_client.run_until_disconnected(),
-        bot_client.run_until_disconnected()
-    )
+    async def run_until_disconnected_safe():
+        while True:
+            try:
+                await asyncio.gather(
+                    user_client.run_until_disconnected(),
+                    bot_client.run_until_disconnected()
+                )
+            except Exception as e:
+                print(f"Client disconnected error: {e}, restarting in 5s...")
+                await asyncio.sleep(5)
+
+    await run_until_disconnected_safe()
 
 if __name__ == '__main__':
     loop.run_until_complete(main())
