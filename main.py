@@ -47,8 +47,8 @@ IS_BOT_SENDING = False
 DEFAULT_PERSONA = (
     "You are Abel (አቤል), the sharp, charismatic, witty, and street-smart Personal Manager of Zelalem (ዘላለም). "
     "You speak fluently in natural, engaging, and friendly Amharic (አራዳና ማራኪ አማርኛ). "
-    "You understand context deeply: if someone talks about Telebirr, money, payments, or screenshots, you talk about money/payments, NEVER about coding or forex. "
-    "You are warm, helpful, and concise."
+    "You never call yourself an AI, robot, Gemini, ChatGPT, or Claude. "
+    "If you cannot handle a complex, highly sensitive financial or personal matter, you gracefully state that you are transferring it directly to your boss Zelalem."
 )
 
 def _load_memory():
@@ -94,7 +94,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "ABEL - Final Contextual Manager is Running 24/7!", 200
+    return "ABEL - Final Master Manager is Running 24/7!", 200
 
 def run_server():
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), use_reloader=False)
@@ -119,7 +119,7 @@ CONTROL_BOT_ID = None
 # ==========================================
 ROLE_DEFINITIONS = {
     "crush": {
-        "title": "❤️ ድብቅ ፍቅረኛ / የምታፈቅራት (Secret Mutual Love)",
+        "title": "❤️ ድብቅ ፍቅረኛ (Secret Mutual Love)",
         "gender": "female (ሴት)",
         "prompt": "CRITICAL VIP: She is Zelalem's secret mutual love. Treat her with extraordinary sweetness, charm, and deep playful care."
     },
@@ -171,7 +171,7 @@ def build_person_menu_text(person_name):
 @bot_client.on(events.NewMessage(pattern='/start'))
 async def bot_start(event):
     await event.reply(
-        "👋 **ሰላም አለቃዬ ዘላለም! አቤል (Abel) በፍጹም ተስተካክሎ ተነስቷል!** 💼✨\n\n"
+        "👋 **ሰላም አለቃዬ ዘላለም! አቤል (Abel) በፍጹም ፍፁም ተስተካክሎ ተነስቷል!** 💼✨\n\n"
         "🥷 **የጓደኛ ስም ለመመዝገብ፦**\n"
         "1️⃣ በሰውየው ቻት ላይ `/name [ስም]` ብለህ ላክ (በ0.1 ሰከንድ ይጠፋል)።\n"
         "2️⃣ እዚህ ቦት ላይ `/[ስም]` ብለህ የጓደኝነት አይነቱን ምረጥ።\n\n"
@@ -337,7 +337,7 @@ async def outgoing_and_stealth_name_handler(event):
     LAST_BOSS_CHAT_TIME[event.chat_id] = time.time()
 
 # ==========================================
-# 7. FINAL AI ENGINE WITH STRICT CONTEXT & TELEBIRR AWARENESS
+# 7. FINAL MASTER AI ENGINE (High IQ + Exact Context)
 # ==========================================
 BROWSER_HEADERS = {
     "Content-Type": "application/json",
@@ -350,10 +350,10 @@ def is_valid_reply(ans):
     bad = ["<!doctype", "<html", "rate limit", "too many requests", "502 bad gateway", "internal server error", "cloudflare"]
     return not any(b in ans.lower() for b in bad)
 
-def call_final_context_ai(system_rules, chat_context, user_text, call_name):
+def call_master_ai(system_rules, chat_context, user_text, call_name):
     messages = [
         {"role": "system", "content": system_rules},
-        {"role": "user", "content": f"[Full Conversation History]\n{chat_context}\n\n[Latest Message / Photo Context from {call_name}]: {user_text}\n\nRespond directly as Abel in natural, smooth Amharic (አራዳና ማራኪ አማርኛ):"}
+        {"role": "user", "content": f"[Conversation History (Up to 200 messages)]\n{chat_context}\n\n[Latest Message / Context from {call_name}]: {user_text}\n\nRespond directly as Abel in natural, smooth Amharic (አራዳና ማራኪ አማርኛ):"}
     ]
 
     for attempt in range(3):
@@ -396,7 +396,7 @@ def call_final_context_ai(system_rules, chat_context, user_text, call_name):
     return f"ሰላም {call_name}! 😊 የጻፍሽውን/ከውን መልዕክት ተረድቻለሁ፤ አለቃዬ ዘላለም ልክ Online ሲገባ ወዲያውኑ አሳውቀዋለሁ 💼✨።"
 
 # ==========================================
-# 8. USERBOT CORE (Strict 5-Min Boss In-Chat Lock & Reaction 🫡 Guard)
+# 8. USERBOT CORE (Strict Boss Activity Lock & Reaction 🫡 Guard)
 # ==========================================
 def is_bot_message(msg):
     if not msg:
@@ -457,7 +457,7 @@ async def did_boss_handle_chat(chat_id, incoming_msg_id):
 async def is_boss_live_online(chat_id, current_status):
     if current_status == "away":
         return False
-    # ባለፉት 5 ደቂቃዎች ውስጥ በዚህ ቻት ውስጥ አለቃው ጽፎ ከሆነ ቦቱ በፍጹም ጣልቃ አይገባም!
+    # አለቃው ባለፉት 5 ደቂቃዎች ውስጥ በዚህ ቻት ውስጥ ጽፎ ከሆነ ቦቱ በፍጹም ዝም ይላል!
     if (time.time() - LAST_BOSS_CHAT_TIME.get(chat_id, 0)) < 300:
         return True
     try:
@@ -493,7 +493,7 @@ async def auto_manager(event):
     boss_online = await is_boss_live_online(event.chat_id, current_status)
 
     if boss_online:
-        # አንተ በቻቱ ውስጥ ንቁ ከሆንክ እስከ 5 ደቂቃ ድረስ እንጠብቃለን፤ አንተ ስትመልስ ቦቱ ሙሉ በሙሉ ዝም ይላል!
+        # አንተ በቻቱ ውስጥ ንቁ ከሆንክ እስከ 5 ደቂቃ ድረስ እንጠብቃለን፤ አንተ React (🫡) ስታደርግ ወይም ስትመልስ ቦቱ ሙሉ በሙሉ ዝም ይላል!
         for _ in range(75):
             await asyncio.sleep(4)
             if await did_boss_handle_chat(event.chat_id, msg_id):
@@ -573,12 +573,13 @@ async def auto_manager(event):
 {f"GLOBAL RULE: {global_rule}" if global_rule else ""}
 
 STRICT INSTRUCTIONS:
-1. IDENTITY: Your name is Abel. You are Zelalem's Personal Manager. NEVER call yourself an AI or bot.
-2. CONTEXT AWARENESS (CRITICAL): Read the conversation history. If the user talks about Telebirr, money, payments, screenshots, debts, or daily life, talk ONLY about money/payments/daily life. NEVER talk about coding, programming, or forex unless explicitly asked about them!
-3. LANGUAGE: Respond in smooth, natural Amharic (አራዳና ማራኪ አማርኛ).
-4. USER NAME: Address the user as "{call_name}".
-5. {relationship_guide}
-6. Keep replies concise (2-4 sentences) with 1-2 fitting emojis. No signature at the end.
+1. IDENTITY: Your name is Abel. You are Zelalem's Personal Manager. NEVER call yourself an AI, robot, bot, Gemini, ChatGPT, or Claude.
+2. BOSS NAME RULE: In normal conversation, refer to your boss as "አለቃዬ". BUT if the user explicitly asks for your boss's name (e.g. "አለቃህ ማነው?", "የአለቃህ ስም ማነው?"), proudly answer: "የአለቃዬ ስም ዘላለም ይባላል ✨" (My boss's name is Zelalem).
+3. SHIFT TO BOSS (ESCALATION): If the user asks an extremely complex, sensitive financial, or personal question that you cannot handle, state clearly: "ይህንን ጉዳይ በቀጥታ ለአለቃዬ (ለዘላለም) አሳልፌ ሰጥቼዋለሁ፤ ራሱ ይመልስልሃል/ሻል" (I have forwarded this matter directly to my boss Zelalem, he will reply to you).
+4. CONTEXT AWARENESS: Read conversation history. Talk strictly about the ongoing topic (Telebirr, money, payments, daily chat, etc.). Never mix up unrelated topics like coding or forex unless asked.
+5. LANGUAGE & STYLE: Respond in smooth, natural Amharic (አራዳና ማራኪ አማርኛ) addressing the user as "{call_name}".
+6. {relationship_guide}
+7. Keep replies concise (2-4 sentences) with 1-2 fitting emojis. No signature at the end.
 """
 
     signature_html = "\n\n<blockquote>✦ <b><i>From Manager</i></b> ✦</blockquote>"
@@ -590,7 +591,7 @@ STRICT INSTRUCTIONS:
         IS_BOT_SENDING = True
         try:
             response_text = await asyncio.to_thread(
-                call_final_context_ai,
+                call_master_ai,
                 system_rules, chat_context, user_text, call_name
             )
 
@@ -647,9 +648,11 @@ async def main():
     try:
         await bot_client.send_message(
             MY_USER_ID,
-            "🚀 **አቤል (Final Telebirr & 5-Min Boss Lock Engine) ተነስቷል!** 💼✨\n\n"
-            "• የቴሌብር ደረሰኝ እና የገንዘብ ሐሳቦች ሲመጡ ኮዲንግ ወይም ፎርክስ እያቀባጠረ ማውራት ሙሉ በሙሉ ጠፍቷል!\n"
-            "• አንተ በቻት ላይ active ስትሆን እስከ 5 ደቂቃ ድረስ ቦቱ ፍጹም ዝም ይላል (አንተ ከመለስክ ጨርሶ አይገባም)።"
+            "🚀 **አቤል (Final Master Code) በሙሉ አቅሙ ተነስቷል!** 💼✨\n\n"
+            "• ስሜ **አቤል** ነው፤ የአለቃዬ ስም ማነው ሲባል **ዘላለም** እላለሁ።\n"
+            "• ከባድ ጉዳይ ሲያጋጥም ወደ አለቃዬ (ወደ ዘላለም) ሺፍት አደርጋለሁ።\n"
+            "• አንተ Online ሆነህ ቻት ላይ ስትጽፍ እስከ 5 ደቂቃ ፍጹም ዝም እላለሁ (Reaction 🫡 ሲደረግም አላስፈላጊ መልስ አልሰጥም)።\n"
+            "• እስከ 200 መልዕክቶች አውድ (Context) ተረድቼ ትክክለኛውን መልስ እሰጣለሁ!"
         )
     except Exception:
         pass
