@@ -16,35 +16,29 @@ import pytz
 from dotenv import load_dotenv
 
 # ==========================================
-# 1. Environment Variables
+# 1. Environment Variables (ከ Render ብቻ የሚነበቡ - GitHub እንዳያግድህ)
 # ==========================================
 load_dotenv()
 
-API_ID = int(os.getenv('API_ID', 32161103))
-API_HASH = os.getenv('API_HASH', '953aae804429e8411062310048d0614c')
+API_ID = int(os.getenv('API_ID', 0))
+API_HASH = os.getenv('API_HASH', '')
 SESSION_STRING = os.getenv('SESSION_STRING', '')
-BOT_TOKEN = os.getenv('BOT_TOKEN', '8645660799:AAFijTW2saTn4PyLEUmolm9r3__kmVoA8BA')
+BOT_TOKEN = os.getenv('BOT_TOKEN', '')
 MY_USERNAME = os.getenv('MY_USERNAME', '@zele1216')
 
-raw_keys = os.getenv('GEMINI_API_KEYS', '')
-GEMINI_KEYS = [k.strip() for k in raw_keys.split(',') if k.strip()]
-
-AI_MODELS = ['gemini-flash-latest', 'gemini-2.0-flash']
-DEAD_KEYS = set()  # የሞቱ ቁልፎችን ድጋሚ እየሞከረ ጊዜ እንዳያጠፋ ይይዛቸዋል
-
 # ==========================================
-# 2. Memory & Settings
+# 2. Memory & State Management
 # ==========================================
 MEMORY_FILE = 'memory.json'
 memory_lock = asyncio.Lock()
 LAST_BOSS_CHAT_TIME = {}
 BOT_SENT_IDS = set()
-IS_BOT_SENDING = False  # ቦቱ ራሱ ሲልክ አለቃው እንደጻፈ እንዳይቆጥር
+IS_BOT_SENDING = False
 
 DEFAULT_PERSONA = (
-    "You are the intelligent, courteous, and professional Personal AI Manager of your boss. "
-    "You have full knowledge of all general topics (such as Forex trading, Agriculture, Science, Education, Technology, etc.) "
-    "and you answer users' questions directly, smartly, and concisely."
+    "You are a highly intelligent, polite, and capable Personal AI Manager built and programmed by your boss. "
+    "You have deep knowledge across all subjects (Agriculture, Forex, Science, Technology, Education, General Knowledge) "
+    "and you converse naturally like a smart human executive assistant."
 )
 
 def _load_memory():
@@ -52,7 +46,8 @@ def _load_memory():
         "status": "online",
         "personality": DEFAULT_PERSONA,
         "missed": [],
-        "processed_ids": []
+        "processed_ids": [],
+        "fallback_timestamps": {}
     }
     if not os.path.exists(MEMORY_FILE):
         return default_data
@@ -79,7 +74,7 @@ def _save_memory(data):
 _save_memory(_load_memory())
 
 # ==========================================
-# 3. Flask Server
+# 3. Flask Server (UptimeRobot 24/7 እንዲያነቃው)
 # ==========================================
 app = Flask(__name__)
 
@@ -111,9 +106,9 @@ CONTROL_BOT_ID = None
 @bot_client.on(events.NewMessage(pattern='/start'))
 async def bot_start(event):
     await event.reply(
-        "👋 **ሰላም አለቃዬ! የ AI Manager ዝግጁ ነው።** 🤖✨\n\n"
+        "👋 **ሰላም አለቃዬ! የ AI Manager (Keyless AI) ዝግጁ ነው።** 🤖✨\n\n"
         "⚙️ **መቆጣጠሪያ ትዕዛዞች:**\n"
-        "🔴 `/away` - ቦቱ ሳይጠብቅ ወዲያውኑ (በ2 ሰከንድ) እንዲመልስ\n"
+        "🔴 `/away` - ቦቱ ሳይጠብቅ ወዲያውኑ እንዲመልስ\n"
         "🟢 `/online` - አንተ በቻት ላይ ስትጽፍ 2 ደቂቃ እንዲጠብቅ\n"
         "🔄 `/reset_persona` - ፀባዩን ወደ ንጹህ ፕሮፌሽናል ለመመለስ\n"
         "📊 `/report` - ያልተመለሱ መልዕክቶችን ለማየት"
@@ -125,7 +120,7 @@ async def set_away(event):
         mem = _load_memory()
         mem["status"] = "away"
         _save_memory(mem)
-    await event.reply("🔴 ሁኔታህ ወደ **AWAY** ተቀይሯል። አሁን በ 2 ሰከንድ ውስጥ ይመልሳል! ⚡")
+    await event.reply("🔴 ሁኔታህ ወደ **AWAY** ተቀይሯል። ቦቱ ወዲያውኑ ይመልሳል! ⚡")
 
 @bot_client.on(events.NewMessage(pattern='/online'))
 async def set_online(event):
@@ -161,51 +156,69 @@ async def get_report(event):
         _save_memory(mem)
 
 # ==========================================
-# 6. Smart AI Engines (Gemini + Instant Keyless AI)
+# 6. 100% Free Keyless Multi-AI Engine (No API Key Needed!)
 # ==========================================
-def run_gemini_request(api_key, model_name, prompt):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
-    headers = {
-        "Content-Type": "application/json",
-        "X-goog-api-key": api_key.strip()
-    }
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    res = requests.post(url, headers=headers, json=payload, timeout=6)
-    if res.status_code == 200:
-        data = res.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    if res.status_code in [400, 401, 403]:
-        DEAD_KEYS.add(api_key)  # የሞተውን ቁልፍ መዝግቦ ያስቀרהዋል
-        raise ValueError("Invalid/Expired Key")
-    raise Exception(f"Status {res.status_code}")
+BROWSER_HEADERS = {
+    "Content-Type": "application/json",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*"
+}
 
-def run_free_backup_ai(system_instruction, user_prompt):
-    """ያለ ምንም API Key ማንኛውንም ጥያቄ (Forex, Agriculture, ወዘተ) የሚመልስ ነፃ AI"""
-    # 1. POST Method (OpenAI GPT-4o-mini endpoint)
+def call_keyless_ai_sync(system_rules, user_prompt):
+    messages = [
+        {"role": "system", "content": system_rules},
+        {"role": "user", "content": user_prompt}
+    ]
+
+    # Engine 1: OpenAI-Compatible Endpoint (GPT-4o-mini / Mistral)
+    for model_name in ["openai", "mistral", "llama"]:
+        try:
+            res = requests.post(
+                "https://text.pollinations.ai/openai",
+                headers=BROWSER_HEADERS,
+                json={"model": model_name, "messages": messages, "temperature": 0.7},
+                timeout=18
+            )
+            if res.status_code == 200:
+                data = res.json()
+                ans = data["choices"][0]["message"]["content"].strip()
+                if ans and "<!DOCTYPE" not in ans:
+                    return ans
+        except Exception:
+            pass
+
+    # Engine 2: Direct Root POST Endpoint
+    for model_name in ["openai", "mistral"]:
+        try:
+            res = requests.post(
+                "https://text.pollinations.ai/",
+                headers=BROWSER_HEADERS,
+                json={"messages": messages, "model": model_name, "private": True},
+                timeout=18
+            )
+            if res.status_code == 200 and res.text.strip():
+                ans = res.text.strip()
+                if "<!DOCTYPE" not in ans and "Rate limit" not in ans:
+                    return ans
+        except Exception:
+            pass
+
+    # Engine 3: Fast GET Endpoint
     try:
-        url = "https://text.pollinations.ai/"
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "messages": [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_prompt}
-            ],
-            "model": "openai",
-            "private": True
-        }
-        res = requests.post(url, headers=headers, json=payload, timeout=12)
+        short_q = urllib.parse.quote(f"{system_rules}\n\n{user_prompt}"[:1500])
+        res = requests.get(
+            f"https://text.pollinations.ai/{short_q}?model=openai",
+            headers=BROWSER_HEADERS,
+            timeout=15
+        )
         if res.status_code == 200 and res.text.strip():
-            return res.text.strip()
+            ans = res.text.strip()
+            if "<!DOCTYPE" not in ans:
+                return ans
     except Exception:
         pass
 
-    # 2. GET Method Backup
-    encoded = urllib.parse.quote(f"{system_instruction}\n\n{user_prompt}")
-    res_get = requests.get(f"https://text.pollinations.ai/{encoded}?model=openai", timeout=12)
-    if res_get.status_code == 200 and res_get.text.strip():
-        return res_get.text.strip()
-
-    raise Exception("Free AI temporarily unreachable")
+    raise Exception("All Keyless AI endpoints busy")
 
 # ==========================================
 # 7. USERBOT CORE
@@ -224,7 +237,6 @@ def has_amharic(text):
 @user_client.on(events.NewMessage(outgoing=True))
 async def track_boss_activity(event):
     global CONTROL_BOT_ID, IS_BOT_SENDING
-    # ቦቱ እራሱ መልስ እየላከ ከሆነ እንደ አለቃው አይቆጥረውም!
     if IS_BOT_SENDING or is_bot_message(event.message):
         return
     if CONTROL_BOT_ID and event.chat_id == CONTROL_BOT_ID:
@@ -256,7 +268,7 @@ async def auto_manager(event):
     except Exception:
         pass
 
-    # አንተ እራስህ በዛ ቻት ላይ ባለፉት 2 ደቂቃዎች ጽፈህ ከነበረ ብቻ ይጠብቃል
+    # አንተ እራስህ በዛ ቻት ላይ ባለፉት 2 ደቂቃዎች ጽፈህ ከነበረ ብቻ 2 ደቂቃ ይጠብቃል
     last_chat_activity = LAST_BOSS_CHAT_TIME.get(event.chat_id, 0)
     boss_active_in_this_chat = (time.time() - last_chat_activity) < 120
 
@@ -268,9 +280,6 @@ async def auto_manager(event):
                 return
         except Exception:
             pass
-    else:
-        # ምንም ሳይጠብቅ በ 1 ሰከንድ ውስጥ ስራ ይጀምራል!
-        await asyncio.sleep(1)
 
     async with memory_lock:
         mem = _load_memory()
@@ -288,10 +297,10 @@ async def auto_manager(event):
         mem.setdefault("missed", []).append({"name": sender_name, "text": short_msg})
         _save_memory(mem)
 
-    # ያለፉትን 40 መልዕክቶች ማንበብ
+    # ያለፉትን 25 መልዕክቶች ማንበብ
     chat_context = ""
     try:
-        hist = await user_client.get_messages(event.chat_id, limit=40)
+        hist = await user_client.get_messages(event.chat_id, limit=25)
         context_lines = []
         for m in reversed(hist):
             if not m or not m.text:
@@ -300,59 +309,46 @@ async def auto_manager(event):
             clean_txt = m.text.replace("✦ From Manager ✦", "").replace("✦ 𝙁𝙧𝙤𝙢 𝙈𝙖𝙣𝙖𝙜𝙚𝙧 ✦", "").strip()
             if clean_txt:
                 context_lines.append(f"{speaker}: {clean_txt}")
-        chat_context = "\n".join(context_lines[-40:])
+        chat_context = "\n".join(context_lines[-25:])
     except Exception:
         pass
 
-    is_amharic_msg = has_amharic(user_text)
+    is_amharic_msg = has_amharic(user_text) or (not any(c.isalpha() for c in user_text) and has_amharic(chat_context))
 
     system_rules = f"""
 {persona}
-STRICT RULES:
-1. Reply language: {"100% AMHARIC (አማርኛ)" if is_amharic_msg else "100% ENGLISH"}.
-2. In Amharic, ALWAYS call your boss "አለቃዬ". In English, ALWAYS call your boss "my boss". NEVER mix languages and NEVER say his real name.
-3. GENERAL QUESTIONS: If the user asks about ANY knowledge topic (e.g., Forex, Agriculture, Science, Math, History, Advice), explain it clearly, smartly, and accurately!
-4. PERSONAL QUESTIONS:
-   - If asked "አንተ ማነህ?" (Who are you?): Say "ሰላም! 😊 እኔ የአለቃዬ የግል AI ማኔጀር ነኝ። አለቃዬ አሁን ኦንላይን ስለሌለ እሱን ወክዬ እያነጋገርኩህ ነው፤ ማንኛውንም ጥያቄ መጠየቅ ትችላለህ! 🙏"
-   - If asked why boss is absent/missed school ("ለምን ትምህርት ቀረህ?"): Say "ሰላም ወንድሜ! 😊 አለቃዬ ዛሬ አስቸኳይ የግል ጉዳይ ስለገጠመው ነው ያልመጣው። ለእሱ የሚተላለፍ መልዕክት ካለህ ንገረኝ ሲመጣ አደርስለታለሁ 🙏"
-5. Keep responses natural, polite, and concise (2 to 4 sentences). Do NOT add a signature.
+
+CRITICAL RULES:
+1. LANGUAGE:
+   - Reply in {"100% AMHARIC (አማርኛ)" if is_amharic_msg else "100% ENGLISH"}.
+   - In Amharic, refer to your boss ONLY as "አለቃዬ".
+   - In English, refer to your boss ONLY as "my boss".
+   - NEVER mix languages and NEVER mention your boss's real name.
+
+2. ANSWER EVERY QUESTION SMARTLY & DIRECTLY:
+   - NEVER send generic "my boss is offline" templates when the user asks a question!
+   - If the user asks about ANY knowledge topic (e.g., "Agriculture ምንድነው?", "Forex ምንድነው?", science, math, technology, advice):
+     Explain and answer the question directly, clearly, and intelligently!
+   - If the user asks "ማነው የሰራህ?" / "Who made you?":
+     Proudly state that your boss ("አለቃዬ" / "my boss") built and programmed you himself!
+   - If the user asks "አንተ ማነህ?" / "Who are you?":
+     Politely say you are the Personal AI Manager of your boss ("የአለቃዬ የግል AI ማኔጀር"), assisting while he is away.
+   - If the user asks a personal question about your boss (e.g., "ዛሬ ለምን ትምህርት ቀረህ?", "የት ነህ?"):
+     Politely explain that your boss had an urgent personal matter today and is currently away, and offer to pass along any message to him.
+
+3. STYLE:
+   - Match the user's gender from chat history (አንተ/ወንድሜ for male, አንቺ/እህቴ for female).
+   - Keep it natural, polite, and concise (2 to 4 sentences) with tasteful emojis (😊, 🙏, ✨).
+   - Do NOT add any signature at the end.
 """
 
-    user_prompt = f"[Recent Chat History]\n{chat_context}\n\n[New Message from {sender_name}]: {user_text}"
-
-    response_text = None
-    success = False
-
-    # 1. ህያው የሆኑ የ Gemini ቁልፎች ካሉ ብቻ ይሞክራል (የሞቱትን ወዲያው ይዘላል)
-    active_keys = [k for k in GEMINI_KEYS if k not in DEAD_KEYS]
-    for key in active_keys:
-        if success:
-            break
-        for model in AI_MODELS:
-            try:
-                response_text = await asyncio.to_thread(run_gemini_request, key, model, f"{system_rules}\n\n{user_prompt}")
-                if response_text and response_text.strip():
-                    success = True
-                    break
-            except ValueError:
-                break
-            except Exception:
-                continue
-
-    # 2. ወዲያውኑ በነፃው Keyless AI ይመልሳል (Forex, Agriculture, ሁሉንም ያውቃል!)
-    if not success or not response_text:
-        try:
-            response_text = await asyncio.to_thread(run_free_backup_ai, system_rules, user_prompt)
-            if response_text and response_text.strip():
-                success = True
-        except Exception as e:
-            print(f"Backup AI Error: {e}")
-
+    user_prompt = f"[Recent Chat]\n{chat_context}\n\n[User ({sender_name}) says]: {user_text}"
     signature_html = "\n\n<blockquote>✦ <b><i>From Manager</i></b> ✦</blockquote>"
 
     IS_BOT_SENDING = True
     try:
-        if success and response_text:
+        try:
+            response_text = await asyncio.to_thread(call_keyless_ai_sync, system_rules, user_prompt)
             clean_reply = response_text.replace("✦ From Manager ✦", "").strip()
             safe_ai_text = html.escape(clean_reply)
             final_reply = f"{safe_ai_text}{signature_html}"
@@ -372,19 +368,30 @@ STRICT RULES:
                     BOT_SENT_IDS.add(sent.id)
 
             try:
-                await bot_client.send_message(MY_USER_ID, f"🔔 **AI ምላሽ ሰጥቷል!**\n👤 ከ: {sender_name}\n💬: {short_msg}\n🤖: {clean_reply[:100]}...")
+                await bot_client.send_message(MY_USER_ID, f"🔔 **AI ምላሽ ሰጥቷል!**\n👤 ከ: {sender_name}\n💬: {short_msg}\n🤖: {clean_reply[:120]}...")
             except Exception:
                 pass
-        else:
-            if is_amharic_msg:
-                offline_body = f"ሰላም {sender_name}! 😊\nአለቃዬ አሁን ለጊዜው Online የለም 💼። መልዕክትህን አስቀምጬለታለሁ፤ ልክ እንደመጣ አይቶ ራሱ ይመልስልሃል 🙏"
-            else:
-                offline_body = f"Hello {sender_name}! 😊\nMy boss is currently away right now 💼. I have noted your message and will notify him as soon as he is back! 🙏"
 
-            final_msg = f"{html.escape(offline_body)}{signature_html}"
-            sent = await event.reply(final_msg, parse_mode='html')
-            if sent:
-                BOT_SENT_IDS.add(sent.id)
+        except Exception as ai_err:
+            async with memory_lock:
+                mem = _load_memory()
+                fallback_timestamps = mem.get("fallback_timestamps", {})
+                last_sent = fallback_timestamps.get(sender_id, 0)
+
+                if time.time() - last_sent >= 3600:
+                    if is_amharic_msg:
+                        offline_body = f"ሰላም {sender_name}! 😊\nአለቃዬ አሁን ለጊዜው Online የለም 💼። መልዕክትህን አስቀምጬለታለሁ፤ ልክ እንደመጣ አይቶ ራሱ ይመልስልሃል 🙏"
+                    else:
+                        offline_body = f"Hello {sender_name}! 😊\nMy boss is currently away right now 💼. I have noted your message and will notify him as soon as he is back! 🙏"
+
+                    final_msg = f"{html.escape(offline_body)}{signature_html}"
+                    sent = await event.reply(final_msg, parse_mode='html')
+                    if sent:
+                        BOT_SENT_IDS.add(sent.id)
+
+                    fallback_timestamps[sender_id] = time.time()
+                    mem["fallback_timestamps"] = fallback_timestamps
+                    _save_memory(mem)
     finally:
         await asyncio.sleep(1)
         IS_BOT_SENDING = False
@@ -413,9 +420,9 @@ async def main():
     try:
         await bot_client.send_message(
             MY_USER_ID,
-            "🚀 **AI MANAGER (Fast Keyless AI) ተነስቷል!** ✨\n"
-            "• የሞቱ ቁልፎችን በመዝለል በ 2 ሰከንድ ውስጥ ይመልሳል!\n"
-            "• Forex፣ Agriculture እና ማንኛውንም ጥያቄ መጠየቅ ትችላለህ።"
+            "🚀 **AI MANAGER (100% Keyless AI) ተነስቷል!** ✨\n"
+            "• የተበላሹት የ Google ቁልፎች ተወግደዋል\n"
+            "• ያለ ምንም API Key ማንኛውንም ጥያቄ (Agriculture, Forex, ማነው የሰራህ) በቀጥታ ይመልሳል!"
         )
     except Exception:
         pass
