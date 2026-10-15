@@ -2,6 +2,7 @@ import os
 import asyncio
 import json
 import time
+import random
 import html
 import urllib.parse
 import requests
@@ -16,7 +17,7 @@ import pytz
 from dotenv import load_dotenv
 
 # ==========================================
-# 1. Environment Variables (ከ Render ብቻ የሚነበቡ - GitHub እንዳያግድህ)
+# 1. Environment Variables (ከ Render የሚነበቡ)
 # ==========================================
 load_dotenv()
 
@@ -106,7 +107,7 @@ CONTROL_BOT_ID = None
 @bot_client.on(events.NewMessage(pattern='/start'))
 async def bot_start(event):
     await event.reply(
-        "👋 **ሰላም አለቃዬ! የ AI Manager (Keyless AI) ዝግጁ ነው።** 🤖✨\n\n"
+        "👋 **ሰላም አለቃዬ! የ AI Manager (Non-Stop AI) ዝግጁ ነው።** 🤖✨\n\n"
         "⚙️ **መቆጣጠሪያ ትዕዛዞች:**\n"
         "🔴 `/away` - ቦቱ ሳይጠብቅ ወዲያውኑ እንዲመልስ\n"
         "🟢 `/online` - አንተ በቻት ላይ ስትጽፍ 2 ደቂቃ እንዲጠብቅ\n"
@@ -156,69 +157,96 @@ async def get_report(event):
         _save_memory(mem)
 
 # ==========================================
-# 6. 100% Free Keyless Multi-AI Engine (No API Key Needed!)
+# 6. Non-Stop Keyless AI Engine (With Smart Retry & Backoff)
 # ==========================================
 BROWSER_HEADERS = {
     "Content-Type": "application/json",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*"
 }
+
+def is_valid_ai_reply(ans):
+    if not ans or len(ans) < 2:
+        return False
+    bad_markers = ["<!DOCTYPE", "<html", "Rate limit", "Too Many Requests", "502 Bad Gateway", "Internal Server Error"]
+    return not any(b.lower() in ans.lower() for b in bad_markers)
 
 def call_keyless_ai_sync(system_rules, user_prompt):
     messages = [
         {"role": "system", "content": system_rules},
         {"role": "user", "content": user_prompt}
     ]
+    models = ["openai", "openai-fast", "mistral", "deepseek"]
 
-    # Engine 1: OpenAI-Compatible Endpoint (GPT-4o-mini / Mistral)
-    for model_name in ["openai", "mistral", "llama"]:
+    # እስከ 3 ዙር ድረስ ትንሽ እያረፈ (Backoff) ይሞክራል — ወደ Offline እንዳይወድቅ!
+    for attempt in range(3):
+        if attempt > 0:
+            time.sleep(2.0 * attempt)  # ተከታታይ መልዕክት ሲመጣ ሰርቨሩ እንዳያግደው 2-4 ሰከንድ ይጠብቃል
+
+        for model_name in models:
+            seed_val = random.randint(1000, 999999)
+
+            # Method A: OpenAI-Compatible Endpoint
+            try:
+                res = requests.post(
+                    "https://text.pollinations.ai/openai",
+                    headers=BROWSER_HEADERS,
+                    json={
+                        "model": model_name,
+                        "messages": messages,
+                        "seed": seed_val,
+                        "temperature": 0.7
+                    },
+                    timeout=20
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    ans = data["choices"][0]["message"]["content"].strip()
+                    if is_valid_ai_reply(ans):
+                        return ans
+            except Exception:
+                pass
+
+            # Method B: Direct Root POST Endpoint
+            try:
+                res = requests.post(
+                    "https://text.pollinations.ai/",
+                    headers=BROWSER_HEADERS,
+                    json={
+                        "messages": messages,
+                        "model": model_name,
+                        "seed": seed_val,
+                        "private": True
+                    },
+                    timeout=20
+                )
+                if res.status_code == 200:
+                    ans = res.text.strip()
+                    if is_valid_ai_reply(ans):
+                        return ans
+            except Exception:
+                pass
+
+            # በሞዴሎች መካከል 0.5 ሰከንድ እረፍት
+            time.sleep(0.5)
+
+        # Method C: Fast GET Endpoint
         try:
-            res = requests.post(
-                "https://text.pollinations.ai/openai",
+            short_q = urllib.parse.quote(f"{system_rules}\n\n{user_prompt}"[:1200])
+            seed_val = random.randint(1000, 999999)
+            res = requests.get(
+                f"https://text.pollinations.ai/{short_q}?model=openai&seed={seed_val}",
                 headers=BROWSER_HEADERS,
-                json={"model": model_name, "messages": messages, "temperature": 0.7},
-                timeout=18
+                timeout=15
             )
             if res.status_code == 200:
-                data = res.json()
-                ans = data["choices"][0]["message"]["content"].strip()
-                if ans and "<!DOCTYPE" not in ans:
-                    return ans
-        except Exception:
-            pass
-
-    # Engine 2: Direct Root POST Endpoint
-    for model_name in ["openai", "mistral"]:
-        try:
-            res = requests.post(
-                "https://text.pollinations.ai/",
-                headers=BROWSER_HEADERS,
-                json={"messages": messages, "model": model_name, "private": True},
-                timeout=18
-            )
-            if res.status_code == 200 and res.text.strip():
                 ans = res.text.strip()
-                if "<!DOCTYPE" not in ans and "Rate limit" not in ans:
+                if is_valid_ai_reply(ans):
                     return ans
         except Exception:
             pass
 
-    # Engine 3: Fast GET Endpoint
-    try:
-        short_q = urllib.parse.quote(f"{system_rules}\n\n{user_prompt}"[:1500])
-        res = requests.get(
-            f"https://text.pollinations.ai/{short_q}?model=openai",
-            headers=BROWSER_HEADERS,
-            timeout=15
-        )
-        if res.status_code == 200 and res.text.strip():
-            ans = res.text.strip()
-            if "<!DOCTYPE" not in ans:
-                return ans
-    except Exception:
-        pass
-
-    raise Exception("All Keyless AI endpoints busy")
+    raise Exception("All AI retries exhausted")
 
 # ==========================================
 # 7. USERBOT CORE
@@ -327,7 +355,7 @@ CRITICAL RULES:
 
 2. ANSWER EVERY QUESTION SMARTLY & DIRECTLY:
    - NEVER send generic "my boss is offline" templates when the user asks a question!
-   - If the user asks about ANY knowledge topic (e.g., "Agriculture ምንድነው?", "Forex ምንድነው?", science, math, technology, advice):
+   - If the user asks about ANY knowledge topic (e.g., Agriculture, Forex, science, math, technology, advice):
      Explain and answer the question directly, clearly, and intelligently!
    - If the user asks "ማነው የሰራህ?" / "Who made you?":
      Proudly state that your boss ("አለቃዬ" / "my boss") built and programmed you himself!
@@ -372,7 +400,7 @@ CRITICAL RULES:
             except Exception:
                 pass
 
-        except Exception as ai_err:
+        except Exception:
             async with memory_lock:
                 mem = _load_memory()
                 fallback_timestamps = mem.get("fallback_timestamps", {})
@@ -420,9 +448,8 @@ async def main():
     try:
         await bot_client.send_message(
             MY_USER_ID,
-            "🚀 **AI MANAGER (100% Keyless AI) ተነስቷል!** ✨\n"
-            "• የተበላሹት የ Google ቁልፎች ተወግደዋል\n"
-            "• ያለ ምንም API Key ማንኛውንም ጥያቄ (Agriculture, Forex, ማነው የሰራህ) በቀጥታ ይመልሳል!"
+            "🚀 **AI MANAGER (Smart Auto-Retry) ተነስቷል!** ✨\n"
+            "• ተከታታይ ጥያቄዎች ሲላኩ ወደ Offline ሳይወድቅ ታግሶ በ AI ይመልሳል!"
         )
     except Exception:
         pass
